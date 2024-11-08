@@ -33,7 +33,9 @@ def check_issue_assignment_events(issue: dict) -> dict:
 
             for event in events:
                 if event.get("event") == "assigned":
-                    assignment_info["assignee"] = event.get("assignee", dict()).get("login", str())
+                    assignment_info["assignee"] = event.get("assignee", dict()).get(
+                        "login", str()
+                    )
                     assignment_info["assigned_at"] = event.get("created_at", str())
 
             return assignment_info
@@ -109,10 +111,14 @@ def get_issues_without_pull_requests(
         issue["assignment_info"] = check_issue_assignment_events(issue)
         assigned_at = issue.get("assignment_info", dict()).get("assigned_at")
 
-        time_delta = relativedelta(
-            dt1=datetime.now(),
-            dt2=datetime.strptime(assigned_at, "%Y-%m-%dT%H:%M:%SZ"),
-        ) if assigned_at else str()
+        time_delta = (
+            relativedelta(
+                dt1=datetime.now(),
+                dt2=datetime.strptime(assigned_at, "%Y-%m-%dT%H:%M:%SZ"),
+            )
+            if assigned_at
+            else str()
+        )
 
         issue["days"] = time_delta.days if time_delta else 0
 
@@ -127,7 +133,10 @@ def get_issues_without_pull_requests(
     result = list()
 
     for issue in issues.copy():
-        if issue.get("days", 0) >= 1 and issue.get("assignee", dict()).get("login") not in pull_requests_users:
+        if (
+            issue.get("days", 0) >= 1
+            and issue.get("assignee", dict()).get("login") not in pull_requests_users
+        ):
             result.append(issue)
 
     return result

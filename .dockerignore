@@ -1,0 +1,6 @@
+docs/
+.venv/
+venv/
+.env.example
+.gitignore
+__pycache__/

@@ -1,0 +1,55 @@
+version: '3.8'
+
+networks:
+  app_network:
+    driver: bridge
+
+services:
+  db:
+    image: postgres
+    restart: always
+    environment:
+      POSTGRES_DB: ${DB_NAME}
+      POSTGRES_USER: ${DB_USER}
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
+      POSTGRES_HOST_AUTH_METHOD: md5
+    volumes:
+      - db_data:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+    networks:
+      - app_network
+
+  backend:
+    build: .
+    restart: always
+    volumes:
+      - .:/app
+      - static_volume:/app/static/
+    env_file:
+      - .env
+    expose:
+      - "8000"
+    depends_on:
+      - db
+    networks:
+      - app_network
+
+  nginx:
+    restart: unless-stopped
+    ports:
+      - "80:80" # add 443 ports on production
+    build:
+      context: ./nginx
+      dockerfile: ./Dockerfile
+    depends_on:
+      - backend
+    volumes:
+      - static_volume:/static/
+    networks:
+      - app_network
+
+
+volumes:
+  db_data:
+  static_volume:

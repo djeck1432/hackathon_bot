@@ -6,7 +6,7 @@ authors = ["iamnovichek <rungotika@gmail.com>"]
 readme = "README.md"
 
 [tool.poetry.dependencies]
-python = "^3.11"
+python = "^3.12"
 Django = "^5.1.2"
 aiogram = "^3.13.1"
 psycopg2-binary = "^2.9.10"
@@ -15,6 +15,9 @@ black = "^24.10.0"
 isort = "^5.13.2"
 requests = "^2.32.3"
 python-dateutil = "^2.9.0.post0"
+sqlalchemy = "^2.0.36"
+sqlalchemy-utils = "^0.41.2"
+gunicorn = "^23.0.0"
 
 
 [build-system]

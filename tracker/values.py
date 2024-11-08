@@ -31,3 +31,4 @@ class DefaultModelValues:
     name_max_length: int = 255
     author_max_length: int = 255
     link_max_length: int = 255
+    email_max_length: int = 255
