@@ -180,6 +180,7 @@ class TelegramUser(AbstractModel):
 
     user = models.OneToOneField(CustomUser, on_delete=models.CASCADE)
     telegram_id = models.CharField(unique=True)
+    notify_about_new_issues = models.BooleanField(default=False)
 
     def __str__(self) -> str:
         """

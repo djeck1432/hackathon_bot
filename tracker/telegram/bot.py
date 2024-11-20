@@ -5,16 +5,18 @@ import sys
 
 from aiogram import Bot, Dispatcher, F
 from aiogram.client.default import DefaultBotProperties
-from aiogram.filters import CommandObject, CommandStart
+from aiogram.filters import CommandObject, CommandStart, Command
 from aiogram.types.message import Message
 from aiogram.utils.deep_linking import create_start_link
 from aiogram.utils.keyboard import ReplyKeyboardBuilder, ReplyKeyboardMarkup
+from django.core.exceptions import ObjectDoesNotExist
 from dotenv import load_dotenv
 
 from tracker import ISSUES_URL, PULLS_URL, get_issues_without_pull_requests
+from tracker.models import TelegramUser
 from tracker.utils import (
     create_telegram_user,
-    get_all_repostitories,
+    get_all_repositories,
     get_user,
     get_all_available_issues,
 )
@@ -67,6 +69,18 @@ async def start_message(message: Message) -> None:
     )
 
 
+@dp.message(Command("notify_about_new_issues"))
+async def subscribe_to_issue_notifications(msg: Message):
+    try:
+        telegram_user = TelegramUser.objects.get(telegram_id=msg.from_user.id)
+        telegram_user.is_subscribed = not telegram_user.is_subscribed
+        telegram_user.save(update_fields=["is_subscribed"])
+        return f"Subscription status updated for Telegram ID {msg.from_user.id}."
+
+    except ObjectDoesNotExist:
+        return f"Telegram user with ID {msg.from_user.id} not found."
+
+
 @dp.message(F.text == "📓get missed deadlines📓")
 async def send_deprecated_issue_assignees(msg: Message) -> None:
     """
@@ -74,7 +88,7 @@ async def send_deprecated_issue_assignees(msg: Message) -> None:
     :param msg: Message instance for communication with a user
     :return: None
     """
-    all_repositories = await get_all_repostitories(msg.from_user.id)
+    all_repositories = await get_all_repositories(msg.from_user.id)
 
     for repository in all_repositories:
         issues = get_issues_without_pull_requests(
@@ -120,7 +134,7 @@ async def send_available_issues(msg: Message) -> None:
     :param msg: Message instance for communication with a user
     :return: None
     """
-    all_repositories = await get_all_repostitories(msg.from_user.id)
+    all_repositories = await get_all_repositories(msg.from_user.id)
 
     for repository in all_repositories:
         issues = get_all_available_issues(

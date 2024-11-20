@@ -15,6 +15,8 @@ from pathlib import Path
 
 from dotenv import load_dotenv
 
+from celery.schedules import timedelta
+
 load_dotenv()
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
@@ -28,7 +30,7 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 SECRET_KEY = os.environ.get("SECRET_KEY")
 
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = False
+DEBUG = True
 
 ALLOWED_HOSTS = ["*"]
 
@@ -43,6 +45,7 @@ INSTALLED_APPS = [
     "django.contrib.messages",
     "django.contrib.staticfiles",
     "tracker",
+
 ]
 
 MIDDLEWARE = [
@@ -139,3 +142,13 @@ LOGOUT_REDIRECT_URL = "/"
 
 GITHUB_AUTH_TOKEN = os.environ.get("GITHUB_AUTH_TOKEN")
 TELEGRAM_AUTH_TOKEN = os.environ.get("TELEGRAM_BOT_TOKEN")
+
+REDIS_IP = os.environ.get("CELERY_BROKER_IP", "redis")
+CELERY_BROKER_URL = f"redis://{REDIS_IP}:6379/0"
+CELERY_RESULT_BACKEND = f"redis://{REDIS_IP}:6379/0"
+CELERY_BEAT_SCHEDULE = {
+    "send_orders_task": {
+        "task": "tracker.tasks.check_for_new_issues",
+        "schedule": timedelta(seconds=10),
+    }
+}
