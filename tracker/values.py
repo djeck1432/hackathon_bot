@@ -10,7 +10,7 @@ PULLS_URL = "https://api.github.com/repos/{owner}/{repo}/pulls"
 
 HEADERS = {
     "Accept": "application/vnd.github+json",
-    "Authorization": f"Bearer {os.environ.get("GITHUB_AUTH_TOKEN", "")}",
+    "Authorization": f'Bearer {os.environ.get("GITHUB_AUTH_TOKEN", "")}',
     "X-GitHub-Api-Version": "2022-11-28",
 }
 

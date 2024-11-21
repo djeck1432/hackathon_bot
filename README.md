@@ -45,9 +45,6 @@ Docker-Compose
     ```dotenv
     # Django
     SECRET_KEY=#
-    ADMIN_USERNAME=#
-    ADMIN_EMAIL=#
-    ADMIN_PASSWORD=#
 
     # PostgreSQL
     DB_NAME=postgres
