@@ -99,20 +99,23 @@ def get_all_open_and_assigned_issues(url: str) -> list[dict]:
         response = requests.get(url, headers=HEADERS)
         response.raise_for_status()
 
-        if response.ok:
-            issues = response.json()
+        issues = response.json()
 
-            open_assigned_issues = list(
-                filter(
-                    lambda issue: issue.get("state") == "open"
-                    and issue.get("assignee")
-                    and not issue.get("draft")
-                    and not issue.get("pull_request"),
-                    issues,
-                )
+        open_assigned_issues = list(
+            filter(
+                lambda issue: not all(
+                    [
+                        issue.get("state") != "open",
+                        issue.get("assignee") is None,
+                        issue.get("draft"),
+                        issue.get("pull_request"),
+                    ]
+                ),
+                issues,
             )
+        )
 
-            return open_assigned_issues
+        return open_assigned_issues
 
     except requests.exceptions.RequestException as e:
         logger.info(e)
@@ -197,20 +200,20 @@ def get_all_available_issues(url: str) -> list[dict]:
         response = requests.get(url, headers=HEADERS)
         response.raise_for_status()
 
-        if response.ok:
-            issues = response.json()
+        issues = response.json()
 
-            available_issues = list(
-                filter(
-                    lambda issue: issue.get("state") == "open"
-                    and not issue.get("assignee")
-                    and not issue.get("draft")
-                    and not issue.get("pull_request"),
-                    issues,
-                )
+        available_issues = list(
+            filter(
+                lambda issue: issue.get("state") == "open"
+                and not issue.get("assignee")
+                and not issue.get("draft")
+                and not issue.get("pull_request"),
+                issues,
             )
-            logger.info(available_issues)
-            return available_issues
+        )
+
+        logger.info(available_issues)
+        return available_issues
 
     except requests.exceptions.RequestException as e:
         logger.info(e)

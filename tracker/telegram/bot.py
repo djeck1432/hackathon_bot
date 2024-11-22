@@ -2,6 +2,7 @@ import asyncio
 import logging
 import os
 import sys
+from string import Template
 
 from aiogram import Bot, Dispatcher, F
 from aiogram.client.default import DefaultBotProperties
@@ -87,25 +88,26 @@ async def send_deprecated_issue_assignees(msg: Message) -> None:
                 repo=repository.get("name", str()),
             ),
         )
-
-        message = (
-            "=" * 50
-            + "\n"
-            + f'<b>Repository: {repository.get("author", str())}/{repository.get("name", str())}</b>'
-            + "\n"
-            + "=" * 50
-            + "\n\n"
-        )
-
+ 
         for issue in issues:
-            message += (
-                "-----------------------------------\n"
-                "Issue: " + issue.get("title", str()) + "\n"
-                "User: " + issue.get("assignee", dict()).get("login", str()) + "\n"
-                "Assigned:" + "\n"
-                "\t\t\t\tDays ago: " + str(issue["days"]) + "\n"
-                "-----------------------------------\n"
-            )
+            message_data = {
+               "repo_author": repository.get("author", str()),
+                "repo_name": repository.get("name", str()),
+                "issue_title": issue.get("title", "No title provided."),
+                "assignee_login": issue.get("assignee", {}).get("login", "Unknown"),
+                "days_ago": str(issue.get("days", "Unknown"))
+            }
+        message_template= Template(
+            """<b>Repository: ${repo_author}/${repo_name}</b>
+            -----------------------------------
+            Issue: ${issue_title}
+            User: ${assignee_login}
+            Assigned:
+                        Days ago: ${days_ago} 
+            -----------------------------------
+            """
+        )
+        message = message_template.safe_substitute(message_data)
 
         if not issues:
             message += "No missed deadlines.\n"
@@ -145,26 +147,26 @@ async def send_available_issues(msg: Message) -> None:
             ),
         )
 
-        message = (
-            "=" * 50
-            + "\n"
-            + f'<b>Repository: {repository.get("author", str())}/{repository.get("name", str())}</b>'
-            + "\n"
-            + "=" * 50
-            + "\n\n"
-        )
-
         for issue in issues:
             description = issue.get("body", "No description provided.")
             escaped_description = escape_html(description)
 
-            message += (
-                "-----------------------------------\n"
-                f"Issue #{issue.get('number', 'Unknown')}: {issue.get('title', 'No title provided')}\n"
-                f"Author: {issue.get('user', {}).get('login', 'Unknown')}\n"
-                f"Description: <blockquote expandable>{escaped_description}</blockquote>\n"
-                "-----------------------------------\n"
+            message_data = {
+                "repo_author": repository.get("author", str()),
+                "repo_name": repository.get("name", str()),
+                "issue_title": issue.get("title", "No title provided."),
+                "assignee_login": issue.get("user", {}).get("login", "Unknown"),
+                "description": description
+            }
+            issue_message_template = Template(
+                """<b>Repository: ${repo_author}/${repo_name}</b>
+                -----------------------------------
+                Issue #${issue_title}
+                Author: ${assignee_login}
+                Description: <blockquote>${description}</blockquote>
+                -----------------------------------"""
             )
+        message = issue_message_template.safe_substitute(message_data)
 
         if not issues:
             message += "No available issues.\n"
