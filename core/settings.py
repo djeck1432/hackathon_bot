@@ -30,7 +30,7 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 SECRET_KEY = os.environ.get("SECRET_KEY")
 
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = True
+DEBUG = os.environ.get("DEBUG")
 
 ALLOWED_HOSTS = [
     os.environ.get("DOMAIN", "*"),
@@ -147,6 +147,8 @@ GITHUB_AUTH_TOKEN = os.environ.get("GITHUB_AUTH_TOKEN")
 TELEGRAM_AUTH_TOKEN = os.environ.get("TELEGRAM_BOT_TOKEN")
 
 REDIS_IP = os.environ.get("CELERY_BROKER_IP", "redis")
+CELERY_ACCEPT_CONTENT = ["json"]
+CELERY_TASK_SERIALIZER = "json"
 CELERY_BROKER_URL = f"redis://{REDIS_IP}:6379/0"
 CELERY_RESULT_BACKEND = f"redis://{REDIS_IP}:6379/0"
 CELERY_BEAT_SCHEDULE = {
