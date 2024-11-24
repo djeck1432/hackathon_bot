@@ -260,3 +260,7 @@ def get_user_revisions(telegram_id: str) -> list[dict]:
                 return_data["reviews"] = reviews_data
                 reviews_list.append(return_data.copy())
     return reviews_list
+
+
+def get_contributor_issues(github_username: str) -> ...:
+    ...

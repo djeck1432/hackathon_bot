@@ -198,6 +198,10 @@ async def send_revision_messages(telegram_id: str, reviews_data: list[dict]) -> 
     await bot.send_message(telegram_id, message)
 
 
+async def get_contributor_tasks(github_username: str) -> ...:
+    ...
+
+
 def main_button_markup() -> ReplyKeyboardMarkup:
     """
     A function that generates a button
