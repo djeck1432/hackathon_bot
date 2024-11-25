@@ -17,6 +17,8 @@ isort = "^5.13.2"
 requests = "^2.32.3"
 python-dateutil = "^2.9.0.post0"
 gunicorn = "^23.0.0"
+celery = "^5.4.0"
+redis = "^5.2.0"
 
 
 [build-system]

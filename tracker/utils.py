@@ -1,18 +1,20 @@
 import logging
 from datetime import datetime
+from typing import Tuple, Any, Dict, List
 
 import requests
 from asgiref.sync import sync_to_async
 from dateutil.relativedelta import relativedelta
 
-from .values import HEADERS
+from .models import Repository, TelegramUser
+from .values import HEADERS, ISSUES_URL
 
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
 
 
 @sync_to_async
-def get_all_repostitories(tele_id: str) -> list[dict]:
+def get_all_repositories(tele_id: str) -> list[dict]:
     """
     A function that returns a list of repositories asyncronously.
     :param tele_id: str
@@ -91,8 +93,8 @@ def check_issue_assignment_events(issue: dict) -> dict:
 
 def get_all_open_and_assigned_issues(url: str) -> list[dict]:
     """
-    Retrieves all open and assigned issues from a given URL.
-    :param url: The API endpoint for issues.
+    Retrieves all open and assigned issues from the given URL.
+    :param url: An API endpoint for issues.
     :return: A list of dictionaries representing open and assigned issues.
     """
     try:
@@ -209,9 +211,65 @@ def get_all_available_issues(url: str) -> list[dict]:
                     issues,
                 )
             )
-            logger.info(available_issues)
             return available_issues
 
     except requests.exceptions.RequestException as e:
         logger.info(e)
     return []
+
+
+def get_all_opened_issues(url: str) -> list[dict]:
+    """
+    Retrieves all opened issues from the given URL.
+    :param url: An API endpoint for issues.
+    :return: A list of dictionaries representing opened issues.
+    """
+    try:
+        response = requests.get(url, headers=HEADERS)
+        response.raise_for_status()
+
+        if response.ok:
+            issues = response.json()
+
+            opened_issues = list(
+                filter(
+                    lambda issue: issue.get("state") == "open"
+                    and not issue.get("draft")
+                    and not issue.get("pull_request"),
+                    issues,
+                )
+            )
+
+            return opened_issues
+    except requests.exceptions.RequestException as e:
+        logger.info(e)
+    return []
+
+
+def get_existing_issues_for_subscribed_users(repositories: list[dict]) -> dict[str, list[str]]:
+    """
+    Retrieves open issues for a given list of repositories.
+
+    :param repositories: List of repositories with "author" and "name".
+    :return: Dictionary with repository names as keys and lists of open issue titles as values.
+    """
+
+    repository_data = {}
+    for repository in repositories:
+        issues = get_all_opened_issues(ISSUES_URL.format(
+            owner=repository.get("author", str()),
+            repo=repository.get("name", str())))
+        repository_data[repository.get("name", str())] = [issue.get("title") for issue in issues]
+    return repository_data
+
+
+def compare_two_repo_dicts(dict1: dict[str, list[str]],
+                           dict2: dict[str, list[str]]) -> dict[str, list[str]]:
+    diff = {}
+    for key in dict1:
+        len_1 = len(dict1[key])
+        len_2 = len(dict2[key])
+        if len_1 > len_2:
+            new_issues = len_1 - len_2
+            diff.update({key: dict1[key][:new_issues]})
+    return diff

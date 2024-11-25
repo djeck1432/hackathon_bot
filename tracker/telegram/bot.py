@@ -72,6 +72,13 @@ async def start_message(message: Message) -> None:
 
 @dp.message(Command("notify_about_new_issues"))
 async def subscribe_to_issue_notifications(msg: Message):
+    """
+
+    Updates telegram user subscription status, and responds with the new subscription status.
+
+    :param msg: Message instance used to retrieve telegram id.
+    :return: None
+    """
     try:
         telegram_user = TelegramUser.objects.filter(telegram_id=msg.from_user.id).first()
         if not telegram_user:
@@ -84,7 +91,7 @@ async def subscribe_to_issue_notifications(msg: Message):
         await msg.answer(f'Your status was successfully changed to "{status}"')
 
     except Exception as e:
-        logger.error(f"During the execution, unexpected error occurred: {e}")
+        logger.info(f"During the execution, unexpected error occurred: {e}")
 
 
 @dp.message(F.text == "📓get missed deadlines📓")
@@ -189,14 +196,18 @@ async def send_available_issues(msg: Message) -> None:
         if not issues:
             message += "No available issues.\n"
 
-        await msg.reply(message, parse_mode="HTML")
+        await msg.reply(message)
 
 
-async def send_new_issue_notification(id_to_repos_map: dict[str, list]):
-    message = "New issue appeared in the following repositories: {}"
+async def send_new_issue_notification(id_to_repos_map: dict[str, list],
+                                      repo_to_issues_map: dict[str, list]):
     for tg_id, repos in id_to_repos_map.values():
-        message.format(", ".join(repos))
-        await bot.send_message(tg_id, message)
+        for repo in repos:
+            message = f"There are new issues in {repo}!\n"
+            repo_issues = repo_to_issues_map[repo]
+            for issue in repo_issues:
+                message += f"<blockquote>{issue}</blockquote>"
+            await bot.send_message(tg_id, message)
 
 
 def main_button_markup() -> ReplyKeyboardMarkup:
