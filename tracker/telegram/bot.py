@@ -3,23 +3,23 @@ import logging
 import os
 import sys
 
-
-from aiogram import Bot, Dispatcher, F
+from aiogram import Bot, Dispatcher, F, html
 from aiogram.client.default import DefaultBotProperties
 from aiogram.filters import CommandObject, CommandStart, Command
 from aiogram.types.message import Message
 from aiogram.utils.deep_linking import create_start_link
 from aiogram.utils.keyboard import ReplyKeyboardBuilder, ReplyKeyboardMarkup
 from dotenv import load_dotenv
-from celery import Celery
 
 from tracker import ISSUES_URL, PULLS_URL, get_issues_without_pull_requests
 from tracker.models import TelegramUser
+from tracker.telegram.templates import TEMPLATES
 from tracker.utils import (
     create_telegram_user,
-    get_all_repositories,
-    get_user,
     get_all_available_issues,
+    get_all_repostitories,
+    get_user,
+    attach_link_to_issue,
 )
 
 load_dotenv()
@@ -49,9 +49,11 @@ async def auth_link_handler(message: Message, command: CommandObject) -> None:
     await create_telegram_user(
         user=next(iter(user)), telegram_id=str(message.from_user.id)
     )
+    message_text = TEMPLATES.greeting.substitute(
+        user_mention=message.from_user.mention_html()
+    )
     await message.answer(
-        f"Hello {message.from_user.mention_html()}!\n"
-        f"Would you like to check some issues?",
+        message_text,
         reply_markup=main_button_markup(),
     )
 
@@ -63,9 +65,11 @@ async def start_message(message: Message) -> None:
     :param message: Message that starts the bot.
     :return: None
     """
+    message_text = TEMPLATES.greeting.substitute(
+        user_mention=message.from_user.mention_html()
+    )
     await message.answer(
-        f"Hello {message.from_user.mention_html()}!\n"
-        f"Would you like to check some issues?",
+        message_text,
         reply_markup=main_button_markup(),
     )
 
@@ -104,6 +108,12 @@ async def send_deprecated_issue_assignees(msg: Message) -> None:
     all_repositories = await get_all_repositories(msg.from_user.id)
 
     for repository in all_repositories:
+
+        repo_message = TEMPLATES.repo_header.substitute(
+            author=repository.get("author", "Unknown"),
+            repo=repository.get("name", "Unknown"),
+        )
+
         issues = get_issues_without_pull_requests(
             issues_url=ISSUES_URL.format(
                 owner=repository.get("author", str()),
@@ -115,27 +125,19 @@ async def send_deprecated_issue_assignees(msg: Message) -> None:
             ),
         )
 
-        message = (
-            "=" * 50
-            + "\n"
-            + f'<b>Repository: {repository.get("author", str())}/{repository.get("name", str())}</b>'
-            + "\n"
-            + "=" * 50
-            + "\n\n"
-        )
-
+        issue_messages = ""
         for issue in issues:
-            message += (
-                "-----------------------------------\n"
-                "Issue: " + issue.get("title", str()) + "\n"
-                "User: " + issue.get("assignee", dict()).get("login", str()) + "\n"
-                "Assigned:" + "\n"
-                "\t\t\t\tDays ago: " + str(issue["days"]) + "\n"
-                "-----------------------------------\n"
+            issue_messages += TEMPLATES.issue_detail.substitute(
+                title=issue.get("title", "No title"),
+                user=issue.get("assignee", {}).get("login", "Unassigned"),
+                days=issue.get("days", "N/A"),
+
             )
 
         if not issues:
-            message += "No missed deadlines.\n"
+            issue_messages = TEMPLATES.no_missed_deadlines.template
+
+        message = repo_message + issue_messages
 
         await msg.reply(f"<blockquote>{message}</blockquote>")
 
@@ -148,11 +150,7 @@ def escape_html(text: str) -> str:
     :return: A string with HTML symbols escaped, replacing '&' with '&amp;', '<' with '&lt;',
              and '>' with '&gt;'.
     """
-    return (
-        text.replace("&", "&amp;")
-        .replace("<", "&lt;")
-        .replace(">", "&gt;")
-    )
+    return html.unparse(text)
 
 
 @dp.message(F.text == "📖get available issues📖")
@@ -165,6 +163,11 @@ async def send_available_issues(msg: Message) -> None:
     all_repositories = await get_all_repositories(msg.from_user.id)
 
     for repository in all_repositories:
+        repo_message = TEMPLATES.repo_header.substitute(
+            author=repository.get("author", "Unknown"),
+            repo=repository.get("name", "Unknown"),
+        )
+
         issues = get_all_available_issues(
             ISSUES_URL.format(
                 owner=repository.get("author", str()),
@@ -172,29 +175,18 @@ async def send_available_issues(msg: Message) -> None:
             ),
         )
 
-        message = (
-            "=" * 50
-            + "\n"
-            + f'<b>Repository: {repository.get("author", str())}/{repository.get("name", str())}</b>'
-            + "\n"
-            + "=" * 50
-            + "\n\n"
-        )
 
+        issue_messages = ""
         for issue in issues:
-            description = issue.get("body", "No description provided.")
-            escaped_description = escape_html(description)
+            issue_messages += TEMPLATES.issue_summary.substitute(
+                title=issue.get("title", "No title provided")
 
-            message += (
-                "-----------------------------------\n"
-                f"Issue #{issue.get('number', 'Unknown')}: {issue.get('title', 'No title provided')}\n"
-                f"Author: {issue.get('user', {}).get('login', 'Unknown')}\n"
-                f"Description: <blockquote expandable>{escaped_description}</blockquote>\n"
-                "-----------------------------------\n"
             )
 
         if not issues:
-            message += "No available issues.\n"
+            issue_messages = TEMPLATES.no_issues.template
+
+        message = repo_message + issue_messages
 
         await msg.reply(message)
 
@@ -208,6 +200,56 @@ async def send_new_issue_notification(id_to_repos_map: dict[str, list],
             for issue in repo_issues:
                 message += f"<blockquote>{issue}</blockquote>"
             await bot.send_message(tg_id, message)
+
+@dp.message(F.text.contains("/issues "))
+async def get_contributor_tasks(message: Message):
+    _ , username = message.text.split(" ", 1)
+
+    regex = r"ODHack"
+
+    issues = get_user_issues(username, True, True, regex)
+
+    msg = "ODHack Issues assigned: \n"
+
+    if len(issues) > 0:
+        for issue in issues:
+            msg += TEMPLATES.issue_list_item.substitute(
+                issue=issue,
+            )
+    else:
+        msg = TEMPLATES.no_issues.template
+    await message.reply(msg)
+
+
+async def send_revision_messages(telegram_id: str, reviews_data: list[dict]) -> None:
+    """
+    Send message for all open PR revisions and approvals
+    :params tele_id: The telegram user id of the user to send to
+    :reviews_data: A list of all the reviews data for all pull requests associated to the user repos
+    """
+    message = (
+        "=" * 50 + "\n" + "<b>Revisions and Approvals</b>" + "\n" + "=" * 50 + "\n\n"
+    )
+    for data in reviews_data:
+        message += (
+            "-------------------------------"
+            f"Repo: <b>{data['repo']}</b>"
+            "\n"
+            f"Pull Request: <b>{data['pull']}/</b>"
+            "\n"
+            f"<b>Reviews:</b>"
+            "\n"
+        )
+        for review in data["reviews"]:
+            message += (
+                f"User: <b>{review['user']['login']}</b>"
+                "\n"
+                f"State: {review['state']}"
+                "\n\n"
+            )
+        message += "-------------------------------"
+    # Send bot message
+    await bot.send_message(telegram_id, message)
 
 
 def main_button_markup() -> ReplyKeyboardMarkup:

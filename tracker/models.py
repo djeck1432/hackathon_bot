@@ -1,7 +1,9 @@
 import requests
 from django.contrib.auth.models import AbstractBaseUser, BaseUserManager
+from django.conf import settings
 from django.core.exceptions import ValidationError
 from django.db import models
+from django_celery_beat.models import IntervalSchedule, PeriodicTask
 
 from shared.models import AbstractModel
 
@@ -119,7 +121,8 @@ class Repository(AbstractModel):
     - name (CharField): The name of the repository with a max length defined by DefaultModelValues.
     - author (CharField): The author of the repository with a max length defined by DefaultModelValues.
     - link (URLField): A URL to the repository with a max length defined by DefaultModelValues.
-
+    - time_limit (PositiveIntegerField): The time limit associated with the repository in seconds.
+    
     Inherits from:
     - AbstractModel: A shared abstract model providing common fields or methods.
 
@@ -131,6 +134,8 @@ class Repository(AbstractModel):
     name = models.CharField(max_length=DefaultModelValues.name_max_length)
     author = models.CharField(max_length=DefaultModelValues.author_max_length)
     link = models.URLField(max_length=DefaultModelValues.link_max_length)
+    time_limit = models.PositiveIntegerField(default=DefaultModelValues.time_limit_default)
+
 
     class Meta:
         verbose_name_plural = "Repositories"
@@ -188,3 +193,23 @@ class TelegramUser(AbstractModel):
         :return: str
         """
         return f"{self.user}: {self.telegram_id}"
+
+    def create_approval_task(
+        self, interval: int = settings.DEFAULT_SCHEDULE_INTERVAL
+    ) -> "PeriodicTask":
+        """
+        Creates a periodic task for fetching user approval and revision.
+        :param interval: The interval for the task (default: 1 hour)
+
+        :return: PeriodicTask
+        """
+        schedule, _ = IntervalSchedule.objects.get_or_create(
+            every=interval, period=IntervalSchedule.SECONDS
+        )
+        task, _ = PeriodicTask.objects.get_or_create(
+            name=f"user_{self.user.id}_approval_task",
+            task="core.tasks.fetch_approvals",
+            interval=schedule,
+            args=[str(self.telegram_id)],
+        )
+        return task

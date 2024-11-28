@@ -20,6 +20,16 @@ services:
     networks:
       - app_network
 
+  redis:
+    container_name: redis
+    image: redis:latest
+    ports:
+      - "${REDIS_PORT}:${REDIS_PORT}"
+    volumes:
+      - redis_data:/data
+    networks:
+      - app_network
+
   backend:
     build: .
     restart: always
@@ -32,9 +42,12 @@ services:
       - "8000"
     depends_on:
       - db
+      - redis
     networks:
       - app_network
+
 
 volumes:
   db_data:
   static_volume:
+  redis_data:

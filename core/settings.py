@@ -47,6 +47,9 @@ INSTALLED_APPS = [
     "django.contrib.sessions",
     "django.contrib.messages",
     "django.contrib.staticfiles",
+    # third party apps
+    "django_celery_beat",
+    # custom apps
     "tracker",
 
 ]
@@ -146,14 +149,19 @@ LOGOUT_REDIRECT_URL = "/"
 GITHUB_AUTH_TOKEN = os.environ.get("GITHUB_AUTH_TOKEN")
 TELEGRAM_AUTH_TOKEN = os.environ.get("TELEGRAM_BOT_TOKEN")
 
-REDIS_IP = os.environ.get("CELERY_BROKER_IP", "redis")
-CELERY_ACCEPT_CONTENT = ["json"]
+
+# Celery settings
+CELERY_BROKER_URL = os.environ.get("REDIS_URL")
+CELERY_RESULT_BACKEND = os.environ.get("REDIS_URL")
+CELERY_ACCEPT_CONTENT = ["application/json"]
 CELERY_TASK_SERIALIZER = "json"
-CELERY_BROKER_URL = f"redis://{REDIS_IP}:6379/0"
-CELERY_RESULT_BACKEND = f"redis://{REDIS_IP}:6379/0"
+CELERY_RESULT_SERIALIZER = "json"
 CELERY_BEAT_SCHEDULE = {
     "send_orders_task": {
         "task": "tracker.tasks.check_for_new_issues",
         "schedule": timedelta(seconds=10),
     }
 }
+
+# Custom app settings
+DEFAULT_SCHEDULE_INTERVAL = 3600

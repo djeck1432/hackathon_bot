@@ -10,8 +10,8 @@ from dotenv import load_dotenv
 
 from tracker.values import ISSUES_URL
 from tracker.models import TelegramUser, Repository
-from tracker.telegram.bot import send_new_issue_notification
-from tracker.utils import get_all_opened_issues, get_existing_issues_for_subscribed_users, compare_two_repo_dicts
+from tracker.telegram.bot import send_new_issue_notification, send_revision_messages
+from tracker.utils import get_all_opened_issues, get_existing_issues_for_subscribed_users, compare_two_repo_dicts, get_user_revisions
 
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
@@ -57,3 +57,22 @@ def get_relevant_recipients() -> None:
             user_repo_map[telegram_user.telegram_id].append(repo.name)
 
     async_to_sync(send_new_issue_notification)(user_repo_map, new_issues)
+    
+
+@shared_task
+def fetch_approvals(telegram_id: str) -> None:
+    """
+    Fetch the approvals and revisions of pull request in the repos of current user.
+    Notify the user via telegram of the results
+
+    :params telegram_id: The telegram id of the user
+    :returns None
+    """
+
+    telegram_user = TelegramUser.objects.filter(telegram_id=telegram_id).first()
+    if not telegram_user:
+        return
+
+    reviews = get_user_revisions(str(telegram_user.telegram_id))
+    if reviews:
+        async_to_sync(send_revision_messages)(telegram_user.telegram_id, reviews)

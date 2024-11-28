@@ -7,6 +7,10 @@ load_dotenv()
 
 ISSUES_URL = "https://api.github.com/repos/{owner}/{repo}/issues"
 PULLS_URL = "https://api.github.com/repos/{owner}/{repo}/pulls"
+PULLS_REVIEWS_URL = (
+    "https://api.github.com/repos/{owner}/{repo}/pulls/{pull_number}/reviews"
+)
+ISSUES_SEARCH = "https://api.github.com/search/issues?q=assignee:{username}+is:issue"
 
 HEADERS = {
     "Accept": "application/vnd.github+json",
@@ -32,3 +36,4 @@ class DefaultModelValues:
     author_max_length: int = 255
     link_max_length: int = 255
     email_max_length: int = 255
+    time_limit_default: int = 86400
