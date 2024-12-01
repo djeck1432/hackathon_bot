@@ -374,3 +374,34 @@ def get_time_before_deadline(issue: dict) -> str:
         return f"Time remaining: {remaining_time.days} days, {remaining_time.seconds // SECONDS_IN_AN_HOUR} hours"
     else:
         return "Deadline has passed."
+
+
+def get_support_link(telegram_username: str) -> str:
+    """
+    Creates a clickable Telegram DM link for support.
+    
+    :param telegram_username: The Telegram username without @ symbol
+    :return: HTML formatted link to Telegram DM
+    """
+    # Remove @ if present in the username
+    clean_username = telegram_username.lstrip('@')
+    telegram_url = f"https://t.me/{clean_username}"
+    
+    return f'<a href="{telegram_url}">{clean_username}</a>'
+
+
+@sync_to_async
+def get_repository_support(author: str, repo_name: str) -> "Support":
+    """
+    Gets the support contact for a specific repository.
+    
+    :param author: Repository author
+    :param repo_name: Repository name
+    :return: Support instance or None
+    """
+    from .models import Repository, Support
+    
+    repository = Repository.objects.filter(author=author, name=repo_name).first()
+    if repository:
+        return Support.objects.filter(user=repository.user).first()
+    return None
