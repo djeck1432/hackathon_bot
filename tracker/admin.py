@@ -6,13 +6,24 @@ from django.db.models import QuerySet
 from django.forms import BaseModelForm
 from django.utils.html import format_html
 from django.utils.safestring import SafeString
-from django_celery_beat.models import IntervalSchedule, PeriodicTask
+from django_celery_beat.models import (
+    IntervalSchedule,
+    PeriodicTask,
+    CrontabSchedule,
+    SolarSchedule,
+    ClockedSchedule
+)
+from django.http import JsonResponse
 
-from .models import Repository
+from .models import Repository, Contributor
 from .telegram.bot import create_tg_link
 
 admin.site.unregister(Group)
-
+admin.site.unregister(IntervalSchedule)
+admin.site.unregister(PeriodicTask)
+admin.site.unregister(CrontabSchedule)
+admin.site.unregister(SolarSchedule)
+admin.site.unregister(ClockedSchedule)
 
 
 @admin.register(Repository)
@@ -72,3 +83,65 @@ class RepositoryAdmin(admin.ModelAdmin):
         queryset = super().get_queryset(request)
 
         return queryset.filter(user=request.user)
+
+
+@admin.register(Contributor)
+class ContributorAdmin(admin.ModelAdmin):
+    """
+    Admin class to manage contributors with role-based visibility.
+
+    Methods:
+        get_queryset: Filters contributors based on the role of the logged-in user.
+        changelist_view: Returns JSON data if requested, otherwise renders admin UI.
+    """
+
+    list_display = ("user", "role", "rank", "notes")
+    search_fields = ("user__email", "user__telegramuser__telegram_id", "role")
+    list_filter = ("role",)
+
+    def get_queryset(self, request) -> QuerySet:
+        """
+        Customize the queryset based on the user's role.
+        Project leads can see all contributors; others see limited data.
+        :param request: HttpRequest
+        :return: QuerySet
+        """
+        queryset = super().get_queryset(request)
+
+        if request.user.is_project_lead():
+            return queryset
+        return queryset.only("id", "user", "role")
+
+    def changelist_view(self, request, extra_context=None):
+        """
+        Customize the change list view for contributors.
+        Returns JSON data if requested via AJAX or API.
+        """
+        if request.headers.get("Content-Type") == "application/json":
+            queryset = self.get_queryset(request)
+            user = request.user
+
+            if user.is_project_lead():
+                data = [
+                    {
+                        "id": contributor.id,
+                        "user": contributor.user.telegramuser.telegram_id,
+                        "role": contributor.role,
+                        "notes": contributor.notes,
+                        "rank": contributor.rank,
+                    }
+                    for contributor in queryset
+                ]
+            else:
+                data = [
+                    {
+                        "id": contributor.id,
+                        "user": contributor.user.telegramuser.telegram_id,
+                        "role": contributor.role,
+                    }
+                    for contributor in queryset
+                ]
+
+            return JsonResponse(data, safe=False)
+
+        return super().changelist_view(request, extra_context=extra_context)

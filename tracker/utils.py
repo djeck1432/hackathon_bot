@@ -1,12 +1,18 @@
 import logging
-from datetime import datetime
+from collections import defaultdict
+from datetime import datetime, timedelta, timezone
 
 import requests
-from asgiref.sync import sync_to_async, async_to_sync
+from asgiref.sync import async_to_sync, sync_to_async
 from dateutil.relativedelta import relativedelta
-from collections import defaultdict
 
-from .values import HEADERS, PULLS_REVIEWS_URL, PULLS_URL
+from .values import (
+    DATETIME_FORMAT,
+    HEADERS,
+    PULLS_REVIEWS_URL,
+    PULLS_URL,
+    SECONDS_IN_AN_HOUR,
+)
 
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
@@ -273,38 +279,43 @@ def get_user_revisions(telegram_id: str) -> list[dict]:
                 reviews_list.append(return_data.copy())
     return reviews_list
 
-def get_contributor_issues(username: str, is_state_open: bool, match_label: bool = False, regex: str = "") -> list:
+
+def get_contributor_issues(
+    username: str, is_state_open: bool, match_label: bool = False, regex: str = ""
+) -> list:
     """
     Retrieves all issues assigned to the github account matching the username.
     :param username: The username of the github account.
     :return: A list representing issues assigned.
     """
     try:
-        api_url = ISSUES_SEARCH.format(username = username)
+        api_url = ISSUES_SEARCH.format(username=username)
 
         response = requests.get(api_url, headers=HEADERS)
 
         response.raise_for_status()
 
-        issues = response.json().get('items', [])
+        issues = response.json().get("items", [])
         issues_format = []
         for issue in issues:
 
-            if is_state_open and issue.get('state') != 'open':
+            if is_state_open and issue.get("state") != "open":
                 continue
 
-            labels = [label.get('name') for label in issue.get('labels', [])]
+            labels = [label.get("name") for label in issue.get("labels", [])]
             for label in labels:
-                if not match_label or re.search(regex, label, re.IGNORECASE): 
+                if not match_label or re.search(regex, label, re.IGNORECASE):
                     issues_format.append(
-                        f"Issue: {issue.get('title')}: {issue.get('html_url')}")
-                    break   
+                        f"Issue: {issue.get('title')}: {issue.get('html_url')}"
+                    )
+                    break
 
         return issues_format
 
     except requests.exceptions.RequestException as e:
         logger.info(e)
     return []
+
 
 def attach_link_to_issue(issue_title: str, issue_link: str) -> str:
     """
@@ -317,3 +328,49 @@ def attach_link_to_issue(issue_title: str, issue_link: str) -> str:
     title = f'<a href="{issue_link}">{issue_title}</a>'
     return title
 
+
+def get_repository_from_issue(issue: dict) -> dict:
+    repository_url = issue.get("repository_url", "")
+    if repository_url:
+        parts = repository_url.rstrip("/").split("/")
+        return {"author": parts[-2], "name": parts[-1]}
+    return {}
+
+
+def get_time_before_deadline(issue: dict) -> str:
+    """
+    Returns the time remaining before the deadline of an assigned issue.
+    If the issue has no assignee or deadline, returns appropriate messages.
+
+    :param issue: The issue dictionary containing information about the issue.
+    :return: Time remaining in a human-readable format.
+    """
+
+    assignment_info = check_issue_assignment_events(issue)
+    assigned_at = assignment_info.get("assigned_at")
+
+    if not assigned_at:
+        return "This issue is not assigned."
+
+    repository_details = get_repository_from_issue(issue)
+    if not repository_details:
+        return "Repository details not found."
+
+    from .models import Repository
+
+    repo = Repository.objects.get(
+        author=repository_details.get("author"), name=repository_details.get("name")
+    )
+    time_limit_seconds = repo.time_limit
+
+    assigned_time = datetime.strptime(assigned_at, DATETIME_FORMAT).replace(
+        tzinfo=timezone.utc
+    )
+    deadline_datetime = assigned_time + timedelta(seconds=time_limit_seconds)
+    now = datetime.now(timezone.utc)
+
+    if deadline_datetime > now:
+        remaining_time = deadline_datetime - now
+        return f"Time remaining: {remaining_time.days} days, {remaining_time.seconds // SECONDS_IN_AN_HOUR} hours"
+    else:
+        return "Deadline has passed."
