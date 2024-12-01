@@ -375,51 +375,6 @@ def get_time_before_deadline(issue: dict) -> str:
     else:
         return "Deadline has passed."
 
-def get_repository_from_issue(issue: dict) -> dict:
-    repository_url = issue.get("repository_url", "")
-    if repository_url:
-        parts = repository_url.rstrip("/").split("/")
-        return {"author": parts[-2], "name": parts[-1]}
-    return {}
-
-
-def get_time_before_deadline(issue: dict) -> str:
-    """
-    Returns the time remaining before the deadline of an assigned issue.
-    If the issue has no assignee or deadline, returns appropriate messages.
-
-    :param issue: The issue dictionary containing information about the issue.
-    :return: Time remaining in a human-readable format.
-    """
-
-    assignment_info = check_issue_assignment_events(issue)
-    assigned_at = assignment_info.get("assigned_at")
-
-    if not assigned_at:
-        return "This issue is not assigned."
-
-    repository_details = get_repository_from_issue(issue)
-    if not repository_details:
-        return "Repository details not found."
-
-    from .models import Repository
-
-    repo = Repository.objects.get(
-        author=repository_details.get("author"), name=repository_details.get("name")
-    )
-    time_limit_seconds = repo.time_limit
-
-    assigned_time = datetime.strptime(assigned_at, DATETIME_FORMAT).replace(
-        tzinfo=timezone.utc
-    )
-    deadline_datetime = assigned_time + timedelta(seconds=time_limit_seconds)
-    now = datetime.now(timezone.utc)
-
-    if deadline_datetime > now:
-        remaining_time = deadline_datetime - now
-        return f"Time remaining: {remaining_time.days} days, {remaining_time.seconds // SECONDS_IN_AN_HOUR} hours"
-    else:
-        return "Deadline has passed."
 
 def get_support_link(telegram_username: str) -> str:
     """
