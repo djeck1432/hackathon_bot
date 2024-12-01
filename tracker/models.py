@@ -297,4 +297,6 @@ class Support(AbstractModel):
         Returns a string representation of the Support instance.
         :return: str
         """
-        return f"Support request from {self.telegram_username}"
+        if self.telegram_username.startswith('@'):
+            return f"{self.telegram_username}"
+        return f"@{self.telegram_username}"
