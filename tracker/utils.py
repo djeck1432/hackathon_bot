@@ -387,4 +387,21 @@ def get_support_link(telegram_username: str) -> str:
     clean_username = telegram_username.lstrip('@')
     telegram_url = f"https://t.me/{clean_username}"
     
-    return f'<a href="{telegram_url}">Contact Support</a>'
+    return f'<a href="{telegram_url}">{clean_username}</a>'
+
+
+@sync_to_async
+def get_repository_support(author: str, repo_name: str) -> "Support":
+    """
+    Gets the support contact for a specific repository.
+    
+    :param author: Repository author
+    :param repo_name: Repository name
+    :return: Support instance or None
+    """
+    from .models import Repository, Support
+    try:
+        repository = Repository.objects.get(author=author, name=repo_name)
+        return Support.objects.filter(user=repository.user).first()
+    except (Repository.DoesNotExist, Support.DoesNotExist):
+        return None

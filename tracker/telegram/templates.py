@@ -13,6 +13,7 @@ class TemplateNames:
     issue_summary: Template
     no_issues: Template
     issue_list_item: Template
+    support_contact: Template
 
 
 TEMPLATES = TemplateNames(
@@ -40,5 +41,6 @@ TEMPLATES = TemplateNames(
         "$issue\n"
         "-----------------------------------\n"
     ),
+    support_contact=Template("Support Contact:\n$support_link"),
 
 )
