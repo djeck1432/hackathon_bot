@@ -6,14 +6,24 @@ from django.db.models import QuerySet
 from django.forms import BaseModelForm
 from django.utils.html import format_html
 from django.utils.safestring import SafeString
-from django_celery_beat.models import IntervalSchedule, PeriodicTask
+from django_celery_beat.models import (
+    IntervalSchedule,
+    PeriodicTask,
+    CrontabSchedule,
+    SolarSchedule,
+    ClockedSchedule
+)
 from django.http import JsonResponse
 
 from .models import Repository, Contributor
 from .telegram.bot import create_tg_link
 
 admin.site.unregister(Group)
-
+admin.site.unregister(IntervalSchedule)
+admin.site.unregister(PeriodicTask)
+admin.site.unregister(CrontabSchedule)
+admin.site.unregister(SolarSchedule)
+admin.site.unregister(ClockedSchedule)
 
 
 @admin.register(Repository)
