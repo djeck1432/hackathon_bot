@@ -317,3 +317,16 @@ def attach_link_to_issue(issue_title: str, issue_link: str) -> str:
     title = f'<a href="{issue_link}">{issue_title}</a>'
     return title
 
+
+def get_support_link(telegram_username: str) -> str:
+    """
+    Creates a clickable Telegram DM link for support.
+    
+    :param telegram_username: The Telegram username without @ symbol
+    :return: HTML formatted link to Telegram DM
+    """
+    # Remove @ if present in the username
+    clean_username = telegram_username.lstrip('@')
+    telegram_url = f"https://t.me/{clean_username}"
+    
+    return f'<a href="{telegram_url}">Contact Support</a>'

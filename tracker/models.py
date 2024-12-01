@@ -234,3 +234,23 @@ class TelegramUser(AbstractModel):
             args=[str(self.telegram_id)],
         )
         return task
+
+
+class Support(AbstractModel):
+    """
+    Represents a support request from a user via Telegram.
+
+    Attributes:
+        user (CustomUser): Foreign key relationship with the CustomUser model.
+        telegram_username (str): The Telegram username of the user requesting support.
+    """
+
+    user = models.ForeignKey(CustomUser, on_delete=models.CASCADE)
+    telegram_username = models.CharField(max_length=DefaultModelValues.name_max_length)
+
+    def __str__(self) -> str:
+        """
+        Returns a string representation of the Support instance.
+        :return: str
+        """
+        return f"Support request from {self.telegram_username}"
