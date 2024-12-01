@@ -400,8 +400,8 @@ def get_repository_support(author: str, repo_name: str) -> "Support":
     :return: Support instance or None
     """
     from .models import Repository, Support
-    try:
-        repository = Repository.objects.get(author=author, name=repo_name)
+    
+    repository = Repository.objects.filter(author=author, name=repo_name).first()
+    if repository:
         return Support.objects.filter(user=repository.user).first()
-    except (Repository.DoesNotExist, Support.DoesNotExist):
-        return None
+    return None

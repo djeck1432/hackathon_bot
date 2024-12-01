@@ -249,6 +249,7 @@ def main_button_markup() -> ReplyKeyboardMarkup:
     builder.button(text="📓get missed deadlines📓")
     builder.button(text="📖get available issues📖")
     builder.button(text="💬Contact Support💬") 
+    builder.adjust(2, 1) 
 
     return builder.as_markup(resize_keyboard=True)
 
