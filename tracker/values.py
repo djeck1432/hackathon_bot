@@ -20,6 +20,8 @@ HEADERS = {
     "X-GitHub-Api-Version": "2022-11-28",
 }
 
+DATETIME_FORMAT = "%Y-%m-%dT%H:%M:%SZ"
+SECONDS_IN_AN_HOUR = 3600
 
 @dataclass(frozen=True)
 class DefaultModelValues:

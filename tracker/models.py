@@ -5,6 +5,9 @@ from django.core.validators import validate_email
 from django.core.exceptions import ValidationError
 from django.db import models
 from django_celery_beat.models import IntervalSchedule, PeriodicTask
+from django.db.models.signals import post_save
+from django.dispatch import receiver
+
 
 from shared.models import AbstractModel
 from tracker.choices import Roles
@@ -132,6 +135,13 @@ class CustomUser(AbstractModel, AbstractBaseUser):
         :return: bool
         """
         return self.is_admin
+    
+    def is_project_lead(self) -> bool:
+        """
+        Checks if the user is a project lead
+        :return: bool
+        """
+        return self.role == Roles.PROJECT_LEAD
 
 
 class Repository(AbstractModel):
@@ -235,6 +245,40 @@ class TelegramUser(AbstractModel):
         )
         return task
 
+
+class Contributor(AbstractModel):
+    """
+    Representes a contributor with specific details and metadata
+    
+    Attributes:
+    - user (CustomUser): A ForeignKey to the CustomUser model.
+    - role (str): The role of the contributor.
+    - notes (str): Notes for contributors, visible only to project leads.
+    - rank (int): A ranking for the contributor, also only visible to project leads.
+    """
+
+    user = models.ForeignKey(CustomUser, on_delete=models.CASCADE, related_name="contributors")
+    role = models.CharField(max_length=ROLE_MAX_CHARACTER_LENGTH, choices=Roles.choices, default=Roles.CONTRIBUTOR)
+    notes = models.TextField(blank=True, null=True)
+    rank = models.IntegerField(default=0)
+
+    class Meta:
+        verbose_name_plural = "Contributors"
+    
+    def __str__(self):
+        """
+        Returns a string representation of the contributor, including the telegram_id from the related TelegramUser.
+        """
+        telegram_id = self.user.telegramuser.telegram_id if hasattr(self.user, 'telegramuser') else "No Telegram ID"
+        return f"Contributor: {telegram_id} (Role: {self.role})"
+    
+@receiver(post_save, sender=CustomUser)
+def create_telegram_user(sender, instance, created, **kwargs):
+    """
+    Signal to create a TelegramUser instance when a new CustomUser is created.
+    """
+    if created:
+        TelegramUser.objects.get_or_create(user=instance, defaults={"telegram_id": f"default_{instance.id}"})
 
 class Support(AbstractModel):
     """
