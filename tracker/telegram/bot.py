@@ -5,12 +5,14 @@ import sys
 
 from aiogram import Bot, Dispatcher, F, html
 from aiogram.client.default import DefaultBotProperties
-from aiogram.filters import CommandObject, CommandStart
+from aiogram.filters import CommandObject, CommandStart, Command
 from aiogram.types.message import Message
 from aiogram.utils.deep_linking import create_start_link
 from aiogram.utils.keyboard import ReplyKeyboardBuilder, ReplyKeyboardMarkup
 from dotenv import load_dotenv
+
 from tracker import ISSUES_URL, PULLS_URL, get_issues_without_pull_requests
+from tracker.models import TelegramUser
 from tracker.telegram.templates import TEMPLATES
 from tracker.utils import (
     create_telegram_user,
@@ -72,6 +74,30 @@ async def start_message(message: Message) -> None:
     )
 
 
+@dp.message(Command("notify_about_new_issues"))
+async def subscribe_to_issue_notifications(msg: Message):
+    """
+
+    Updates telegram user subscription status, and responds with the new subscription status.
+
+    :param msg: Message instance used to retrieve telegram id.
+    :return: None
+    """
+    try:
+        telegram_user = TelegramUser.objects.filter(telegram_id=msg.from_user.id).first()
+        if not telegram_user:
+            await msg.answer(f"Telegram user with ID {msg.from_user.id} not found.")
+            return
+
+        telegram_user.is_subscribed = not telegram_user.is_subscribed
+        telegram_user.save(update_fields=["is_subscribed"])
+        status = "subscribed" if telegram_user.is_subscribed else "unsubscribed"
+        await msg.answer(f'Your status was successfully changed to "{status}"')
+
+    except Exception as e:
+        logger.info(f"During the execution, unexpected error occurred: {e}")
+
+
 @dp.message(F.text == "📓get missed deadlines📓")
 async def send_deprecated_issue_assignees(msg: Message) -> None:
     """
@@ -79,7 +105,7 @@ async def send_deprecated_issue_assignees(msg: Message) -> None:
     :param msg: Message instance for communication with a user
     :return: None
     """
-    all_repositories = await get_all_repostitories(msg.from_user.id)
+    all_repositories = await get_all_repositories(msg.from_user.id)
 
     for repository in all_repositories:
 
@@ -134,7 +160,7 @@ async def send_available_issues(msg: Message) -> None:
     :param msg: Message instance for communication with a user
     :return: None
     """
-    all_repositories = await get_all_repostitories(msg.from_user.id)
+    all_repositories = await get_all_repositories(msg.from_user.id)
 
     for repository in all_repositories:
         repo_message = TEMPLATES.repo_header.substitute(
@@ -162,7 +188,18 @@ async def send_available_issues(msg: Message) -> None:
 
         message = repo_message + issue_messages
 
-        await msg.reply(message, parse_mode="HTML")
+        await msg.reply(message)
+
+
+async def send_new_issue_notification(id_to_repos_map: dict[str, list],
+                                      repo_to_issues_map: dict[str, list]):
+    for tg_id, repos in id_to_repos_map.values():
+        for repo in repos:
+            message = f"There are new issues in {repo}!\n"
+            repo_issues = repo_to_issues_map[repo]
+            for issue in repo_issues:
+                message += f"<blockquote>{issue}</blockquote>"
+            await bot.send_message(tg_id, message)
 
 @dp.message(F.text.contains("/issues "))
 async def get_contributor_tasks(message: Message):

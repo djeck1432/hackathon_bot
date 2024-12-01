@@ -15,6 +15,8 @@ from pathlib import Path
 
 from dotenv import load_dotenv
 
+from celery.schedules import timedelta
+
 load_dotenv()
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
@@ -28,7 +30,7 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 SECRET_KEY = os.environ.get("SECRET_KEY")
 
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = False
+DEBUG = os.environ.get("DEBUG")
 
 ALLOWED_HOSTS = [
     os.environ.get("DOMAIN", "*"),
@@ -49,6 +51,7 @@ INSTALLED_APPS = [
     "django_celery_beat",
     # custom apps
     "tracker",
+
 ]
 
 MIDDLEWARE = [
@@ -148,13 +151,17 @@ TELEGRAM_AUTH_TOKEN = os.environ.get("TELEGRAM_BOT_TOKEN")
 
 
 # Celery settings
-
 CELERY_BROKER_URL = os.environ.get("REDIS_URL")
 CELERY_RESULT_BACKEND = os.environ.get("REDIS_URL")
 CELERY_ACCEPT_CONTENT = ["application/json"]
 CELERY_TASK_SERIALIZER = "json"
 CELERY_RESULT_SERIALIZER = "json"
+CELERY_BEAT_SCHEDULE = {
+    "send_orders_task": {
+        "task": "tracker.tasks.check_for_new_issues",
+        "schedule": timedelta(seconds=10),
+    }
+}
 
 # Custom app settings
-
 DEFAULT_SCHEDULE_INTERVAL = 3600
