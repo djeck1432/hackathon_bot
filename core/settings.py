@@ -13,9 +13,8 @@ https://docs.djangoproject.com/en/5.1/ref/settings/
 import os
 from pathlib import Path
 
-from dotenv import load_dotenv
-
 from celery.schedules import timedelta
+from dotenv import load_dotenv
 
 load_dotenv()
 
@@ -30,12 +29,17 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 SECRET_KEY = os.environ.get("SECRET_KEY")
 
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = os.environ.get("DEBUG")
+DEBUG = True if os.environ.get("DEBUG") == "True" else False
 
-ALLOWED_HOSTS = [
-    os.environ.get("DOMAIN", "*"),
-    os.environ.get("HOST_IP", "127.0.0.1"),
-]
+
+ALLOWED_HOSTS = (
+    [
+        os.environ.get("DOMAIN", "*"),
+        os.environ.get("HOST_IP", "127.0.0.1"),
+    ]
+    if not DEBUG
+    else ["*"]
+)
 
 
 # Application definition
@@ -51,7 +55,6 @@ INSTALLED_APPS = [
     "django_celery_beat",
     # custom apps
     "tracker",
-
 ]
 
 MIDDLEWARE = [

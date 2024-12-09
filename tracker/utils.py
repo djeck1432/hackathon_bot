@@ -1,27 +1,36 @@
 import logging
-
-from datetime import datetime, timedelta, timezone
-from typing import Tuple, Any, Dict, List
+import re
 from collections import defaultdict
+from datetime import datetime, timedelta, timezone
 
 import requests
+from aiogram import html
 from asgiref.sync import async_to_sync, sync_to_async
 from dateutil.relativedelta import relativedelta
 
-
-from .models import Repository, TelegramUser
 from .values import (
     DATETIME_FORMAT,
-    SECONDS_IN_AN_HOUR,
-    HEADERS, 
-    PULLS_REVIEWS_URL, 
-    PULLS_URL, 
+    HEADERS,
+    ISSUES_SEARCH,
     ISSUES_URL,
+    PULLS_REVIEWS_URL,
+    PULLS_URL,
+    SECONDS_IN_AN_HOUR,
 )
-
 
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
+
+
+def escape_html(text: str) -> str:
+    """
+    Escapes HTML symbols in the text to ensure proper rendering in Telegram messages.
+
+    :param text: The input string that may contain HTML symbols.
+    :return: A string with HTML symbols escaped, replacing '&' with '&amp;', '<' with '&lt;',
+             and '>' with '&gt;'.
+    """
+    return html.unparse(text)
 
 
 @sync_to_async
@@ -33,9 +42,11 @@ def get_all_repositories(tele_id: str) -> list[dict]:
     """
     from .models import TelegramUser
 
-    repositories = TelegramUser.objects.get(
-        telegram_id=tele_id
-    ).user.repository_set.values()
+    repositories = (
+        TelegramUser.objects.filter(telegram_id=tele_id)
+        .first()
+        .user.repository_set.values()
+    )
 
     return list(repositories)
 
@@ -233,7 +244,7 @@ def get_all_available_issues(url: str) -> list[dict]:
                 issues,
             )
         )
-        logger.info(available_issues)
+
         return available_issues
 
     except requests.exceptions.RequestException as e:
@@ -251,7 +262,7 @@ def get_pull_reviews(url: str) -> list[dict]:
         response = requests.get(url, headers=HEADERS)
         response.raise_for_status()
         return response.json()
-      
+
     except requests.exceptions.RequestException as e:
         logger.info(e)
     return []
@@ -263,7 +274,7 @@ def get_user_revisions(telegram_id: str) -> list[dict]:
     :params tele_id: The TelegramUser id of the user
     :return: A list of reviews for all the user repos open PRS
     """
-    repos = async_to_sync(get_all_repostitories)(telegram_id)
+    repos = async_to_sync(get_all_repositories)(telegram_id)
     reviews_list = []
     for repo in repos:
         pulls = get_all_open_pull_requests(
@@ -294,11 +305,10 @@ def get_contributor_issues(
     :param username: The username of the github account.
     :return: A list representing issues assigned.
     """
+    api_url = ISSUES_SEARCH.format(username=username)
+
     try:
-        api_url = ISSUES_SEARCH.format(username=username)
-
         response = requests.get(api_url, headers=HEADERS)
-
         response.raise_for_status()
 
         issues = response.json().get("items", [])
@@ -311,9 +321,7 @@ def get_contributor_issues(
             labels = [label.get("name") for label in issue.get("labels", [])]
             for label in labels:
                 if not match_label or re.search(regex, label, re.IGNORECASE):
-                    issues_format.append(
-                        f"Issue: {issue.get('title')}: {issue.get('html_url')}"
-                    )
+                    issues_format.append(f"Issue: {attach_link_to_issue(issue)}")
                     break
 
         return issues_format
@@ -321,7 +329,6 @@ def get_contributor_issues(
     except requests.exceptions.RequestException as e:
         logger.info(e)
     return []
-
 
 
 def get_all_opened_issues(url: str) -> list[dict]:
@@ -350,7 +357,9 @@ def get_all_opened_issues(url: str) -> list[dict]:
     return []
 
 
-def get_existing_issues_for_subscribed_users(repositories: list[dict]) -> dict[str, list[str]]:
+def get_existing_issues_for_subscribed_users(
+    repositories: list[dict],
+) -> dict[str, list[str]]:
     """
     Retrieves open issues for a given list of repositories.
 
@@ -360,15 +369,21 @@ def get_existing_issues_for_subscribed_users(repositories: list[dict]) -> dict[s
 
     repository_data = {}
     for repository in repositories:
-        issues = get_all_opened_issues(ISSUES_URL.format(
-            owner=repository.get("author", str()),
-            repo=repository.get("name", str())))
-        repository_data[repository.get("name", str())] = [issue.get("title") for issue in issues]
+        issues = get_all_opened_issues(
+            ISSUES_URL.format(
+                owner=repository.get("author", str()),
+                repo=repository.get("name", str()),
+            )
+        )
+        repository_data[repository.get("name", str())] = [
+            issue.get("title") for issue in issues
+        ]
     return repository_data
 
 
-def compare_two_repo_dicts(dict1: dict[str, list[str]],
-                           dict2: dict[str, list[str]]) -> dict[str, list[str]]:
+def compare_two_repo_dicts(
+    dict1: dict[str, list[str]], dict2: dict[str, list[str]]
+) -> dict[str, list[str]]:
     diff = {}
     for key in dict1:
         len_1 = len(dict1[key])
@@ -379,7 +394,7 @@ def compare_two_repo_dicts(dict1: dict[str, list[str]],
     return diff
 
 
-def attach_link_to_issue(issue_title: str, issue_link: str) -> str:
+def attach_link_to_issue(issue: dict) -> str:
     """
     Attaches the issue link to the issue title
     :params issue_title: The title of the issue
@@ -387,6 +402,9 @@ def attach_link_to_issue(issue_title: str, issue_link: str) -> str:
 
     :return: str
     """
+    issue_title: str = issue.get("title", "")
+    issue_link: str = issue.get("html_url", "")
+
     title = f'<a href="{issue_link}">{issue_title}</a>'
     return title
 
@@ -441,28 +459,29 @@ def get_time_before_deadline(issue: dict) -> str:
 def get_support_link(telegram_username: str) -> str:
     """
     Creates a clickable Telegram DM link for support.
-    
+
     :param telegram_username: The Telegram username without @ symbol
     :return: HTML formatted link to Telegram DM
     """
     # Remove @ if present in the username
-    clean_username = telegram_username.lstrip('@')
+    clean_username = telegram_username.lstrip("@")
     telegram_url = f"https://t.me/{clean_username}"
-    
-    return f'<a href="{telegram_url}">{clean_username}</a>'
+
+    # return escape_html(f'<a href="{telegram_url}">{clean_username}</a>')
+    return telegram_url
 
 
 @sync_to_async
 def get_repository_support(author: str, repo_name: str) -> "Support":
     """
     Gets the support contact for a specific repository.
-    
+
     :param author: Repository author
     :param repo_name: Repository name
     :return: Support instance or None
     """
     from .models import Repository, Support
-    
+
     repository = Repository.objects.filter(author=author, name=repo_name).first()
     if repository:
         return Support.objects.filter(user=repository.user).first()

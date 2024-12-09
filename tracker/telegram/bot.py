@@ -3,9 +3,9 @@ import logging
 import os
 import sys
 
-from aiogram import Bot, Dispatcher, F, html
+from aiogram import Bot, Dispatcher, F
 from aiogram.client.default import DefaultBotProperties
-from aiogram.filters import CommandObject, CommandStart, Command
+from aiogram.filters import Command, CommandObject, CommandStart
 from aiogram.types.message import Message
 from aiogram.utils.deep_linking import create_start_link
 from aiogram.utils.keyboard import ReplyKeyboardBuilder, ReplyKeyboardMarkup
@@ -15,13 +15,14 @@ from tracker import ISSUES_URL, PULLS_URL, get_issues_without_pull_requests
 from tracker.models import TelegramUser
 from tracker.telegram.templates import TEMPLATES
 from tracker.utils import (
+    attach_link_to_issue,
     create_telegram_user,
     get_all_available_issues,
     get_all_repostitories,
-    get_user,
-    attach_link_to_issue,
+    get_contributor_issues,
     get_repository_support,
     get_support_link,
+    get_user,
 )
 
 load_dotenv()
@@ -86,7 +87,9 @@ async def subscribe_to_issue_notifications(msg: Message):
     :return: None
     """
     try:
-        telegram_user = TelegramUser.objects.filter(telegram_id=msg.from_user.id).first()
+        telegram_user = TelegramUser.objects.filter(
+            telegram_id=msg.from_user.id
+        ).first()
         if not telegram_user:
             await msg.answer(f"Telegram user with ID {msg.from_user.id} not found.")
             return
@@ -130,10 +133,9 @@ async def send_deprecated_issue_assignees(msg: Message) -> None:
         issue_messages = ""
         for issue in issues:
             issue_messages += TEMPLATES.issue_detail.substitute(
-                title=issue.get("title", "No title"),
+                title=attach_link_to_issue(issue=issue),
                 user=issue.get("assignee", {}).get("login", "Unassigned"),
                 days=issue.get("days", "N/A"),
-
             )
 
         if not issues:
@@ -142,17 +144,6 @@ async def send_deprecated_issue_assignees(msg: Message) -> None:
         message = repo_message + issue_messages
 
         await msg.reply(f"<blockquote>{message}</blockquote>")
-
-
-def escape_html(text: str) -> str:
-    """
-    Escapes HTML symbols in the text to ensure proper rendering in Telegram messages.
-
-    :param text: The input string that may contain HTML symbols.
-    :return: A string with HTML symbols escaped, replacing '&' with '&amp;', '<' with '&lt;',
-             and '>' with '&gt;'.
-    """
-    return html.unparse(text)
 
 
 @dp.message(F.text == "📖get available issues📖")
@@ -177,12 +168,10 @@ async def send_available_issues(msg: Message) -> None:
             ),
         )
 
-
         issue_messages = ""
         for issue in issues:
             issue_messages += TEMPLATES.issue_summary.substitute(
-                title=issue.get("title", "No title provided")
-
+                title=attach_link_to_issue(issue)
             )
 
         if not issues:
@@ -193,8 +182,9 @@ async def send_available_issues(msg: Message) -> None:
         await msg.reply(message)
 
 
-async def send_new_issue_notification(id_to_repos_map: dict[str, list],
-                                      repo_to_issues_map: dict[str, list]):
+async def send_new_issue_notification(
+    id_to_repos_map: dict[str, list], repo_to_issues_map: dict[str, list]
+):
     for tg_id, repos in id_to_repos_map.values():
         for repo in repos:
             message = f"There are new issues in {repo}!\n"
@@ -203,13 +193,14 @@ async def send_new_issue_notification(id_to_repos_map: dict[str, list],
                 message += f"<blockquote>{issue}</blockquote>"
             await bot.send_message(tg_id, message)
 
+
 @dp.message(F.text.contains("/issues "))
 async def get_contributor_tasks(message: Message):
-    _ , username = message.text.split(" ", 1)
+    _, username = message.text.split(" ", 1)
 
     regex = r"ODHack"
 
-    issues = get_user_issues(username, True, True, regex)
+    issues = get_contributor_issues(username, True, True, regex)
 
     msg = "ODHack Issues assigned: \n"
 
@@ -262,18 +253,23 @@ async def send_support_contacts(msg: Message) -> None:
     :return: None
     """
     all_repositories = await get_all_repostitories(msg.from_user.id)
-    
+
     for repository in all_repositories:
         repo_message = TEMPLATES.repo_header.substitute(
             author=repository.get("author", "Unknown"),
             repo=repository.get("name", "Unknown"),
         )
-        
+
         # Get support contact for this repository
-        support = await get_repository_support(repository.get("author"), repository.get("name"))
+        support = await get_repository_support(
+            repository.get("author"), repository.get("name")
+        )
         if support:
             support_link = get_support_link(support.telegram_username)
-            message = f"{repo_message}\n{support_link}"
+            message = TEMPLATES.support_contact.substitute(
+                repo_message=repo_message,
+                support_link=support_link,
+            )
             await msg.reply(message, parse_mode="HTML")
 
 
@@ -285,8 +281,8 @@ def main_button_markup() -> ReplyKeyboardMarkup:
     builder = ReplyKeyboardBuilder()
     builder.button(text="📓get missed deadlines📓")
     builder.button(text="📖get available issues📖")
-    builder.button(text="💬Contact Support💬") 
-    builder.adjust(2, 1) 
+    builder.button(text="💬Contact Support💬")
+    builder.adjust(2, 1)
 
     return builder.as_markup(resize_keyboard=True)
 

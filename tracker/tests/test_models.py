@@ -5,10 +5,11 @@ django.setup()
 from django.test import TestCase
 from faker import Faker
 
-from tracker.models import CustomUser
 from tracker.choices import Roles
+from tracker.models import CustomUser
 
 fake = Faker()
+
 
 class TestCustomUserManager(TestCase):
     def setUp(self):
@@ -20,11 +21,9 @@ class TestCustomUserManager(TestCase):
     def test_create_user(self):
         """Test creating a regular user."""
         user = CustomUser.objects.create_user(
-            email=self.email,
-            password=self.password,
-            role=self.role
+            email=self.email, password=self.password, role=self.role
         )
-        
+
         self.assertEqual(user.email, self.email)
         self.assertTrue(user.is_active)
         self.assertFalse(user.is_admin)
@@ -35,11 +34,9 @@ class TestCustomUserManager(TestCase):
     def test_create_superuser(self):
         """Test creating a superuser."""
         superuser = CustomUser.objects.create_superuser(
-            email=self.email,
-            password=self.password,
-            role=self.role
+            email=self.email, password=self.password, role=self.role
         )
-        
+
         self.assertEqual(superuser.email, self.email)
         self.assertTrue(superuser.is_active)
         self.assertTrue(superuser.is_admin)
@@ -50,12 +47,10 @@ class TestCustomUserManager(TestCase):
     def test_create_user_with_invalid_email(self):
         """Test creating a user with invalid email format."""
         invalid_email = "invalid.email@format"
-        
+
         with self.assertRaises(ValueError) as context:
             CustomUser.objects.create_user(
-                email=invalid_email,
-                password=self.password,
-                role=self.role
+                email=invalid_email, password=self.password, role=self.role
             )
-        
+
         self.assertEqual(str(context.exception), "Invalid email format")
