@@ -2,6 +2,8 @@ from django import forms
 from django.core.exceptions import ValidationError
 from django.db import transaction
 
+from .choices import Roles
+
 from .models import CustomUser
 
 
@@ -16,6 +18,7 @@ class SignUpForm(forms.ModelForm):
         email (EmailField): An email input field for the user's email.
         password (CharField): A password input field for the user's password.
         confirm_password (CharField): A password input field to confirm the user's password.
+        role (ChoiceField): A dropdown of user roles (contributor, tech-lead).
 
     Meta:
         model (CustomUser): The model that this form is built on.
@@ -29,6 +32,7 @@ class SignUpForm(forms.ModelForm):
     email = forms.EmailField()
     password = forms.CharField(widget=forms.PasswordInput())
     confirm_password = forms.CharField(widget=forms.PasswordInput())
+    role = forms.ChoiceField(choices=Roles.choices)
 
     class Meta:
         model = CustomUser
@@ -58,6 +62,7 @@ class SignUpForm(forms.ModelForm):
             new_user = CustomUser.objects.create_superuser(
                 email=self.cleaned_data.get("email", ""),
                 password=self.cleaned_data.get("password", ""),
+                role=self.cleaned_data.get("role", ""),
             )
 
             return new_user

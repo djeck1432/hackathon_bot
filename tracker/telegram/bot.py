@@ -20,6 +20,8 @@ from tracker.utils import (
     get_all_repostitories,
     get_user,
     attach_link_to_issue,
+    get_repository_support,
+    get_support_link,
 )
 
 load_dotenv()
@@ -252,6 +254,29 @@ async def send_revision_messages(telegram_id: str, reviews_data: list[dict]) -> 
     await bot.send_message(telegram_id, message)
 
 
+@dp.message(F.text == "💬Contact Support💬")
+async def send_support_contacts(msg: Message) -> None:
+    """
+    Sends support contact information for all repositories.
+    :param msg: Message instance for communication with a user
+    :return: None
+    """
+    all_repositories = await get_all_repostitories(msg.from_user.id)
+    
+    for repository in all_repositories:
+        repo_message = TEMPLATES.repo_header.substitute(
+            author=repository.get("author", "Unknown"),
+            repo=repository.get("name", "Unknown"),
+        )
+        
+        # Get support contact for this repository
+        support = await get_repository_support(repository.get("author"), repository.get("name"))
+        if support:
+            support_link = get_support_link(support.telegram_username)
+            message = f"{repo_message}\n{support_link}"
+            await msg.reply(message, parse_mode="HTML")
+
+
 def main_button_markup() -> ReplyKeyboardMarkup:
     """
     A function that generates a button
@@ -260,6 +285,8 @@ def main_button_markup() -> ReplyKeyboardMarkup:
     builder = ReplyKeyboardBuilder()
     builder.button(text="📓get missed deadlines📓")
     builder.button(text="📖get available issues📖")
+    builder.button(text="💬Contact Support💬") 
+    builder.adjust(2, 1) 
 
     return builder.as_markup(resize_keyboard=True)
 
