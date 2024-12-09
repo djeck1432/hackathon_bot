@@ -18,7 +18,7 @@ from tracker.utils import (
     attach_link_to_issue,
     create_telegram_user,
     get_all_available_issues,
-    get_all_repostitories,
+    get_all_repositories,
     get_contributor_issues,
     get_repository_support,
     get_support_link,
@@ -252,7 +252,7 @@ async def send_support_contacts(msg: Message) -> None:
     :param msg: Message instance for communication with a user
     :return: None
     """
-    all_repositories = await get_all_repostitories(msg.from_user.id)
+    all_repositories = await get_all_repositories(msg.from_user.id)
 
     for repository in all_repositories:
         repo_message = TEMPLATES.repo_header.substitute(
