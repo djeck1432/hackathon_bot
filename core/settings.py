@@ -28,12 +28,16 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 SECRET_KEY = os.environ.get("SECRET_KEY")
 
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = False
+DEBUG = True if os.environ.get("DEBUG") == "True" else False
 
-ALLOWED_HOSTS = [
-    os.environ.get("DOMAIN", "*"),
-    os.environ.get("HOST_IP", "127.0.0.1"),
-]
+ALLOWED_HOSTS = (
+    [
+        os.environ.get("DOMAIN", "*"),
+        os.environ.get("HOST_IP", "127.0.0.1"),
+    ]
+    if not DEBUG
+    else ["*"]
+)
 
 
 # Application definition
