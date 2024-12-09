@@ -41,6 +41,5 @@ TEMPLATES = TemplateNames(
         "$issue\n"
         "-----------------------------------\n"
     ),
-    support_contact=Template("Support Contact:\n$support_link"),
-
+    support_contact=Template("Support Contact:\n$repo_message\n$support_link"),
 )

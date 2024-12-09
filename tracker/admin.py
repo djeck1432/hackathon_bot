@@ -3,19 +3,19 @@ import asyncio
 from django.contrib import admin
 from django.contrib.auth.models import Group
 from django.db.models import QuerySet
-from django.forms import BaseModelForm
+from django.http import JsonResponse
 from django.utils.html import format_html
 from django.utils.safestring import SafeString
 from django_celery_beat.models import (
+    ClockedSchedule,
+    CrontabSchedule,
     IntervalSchedule,
     PeriodicTask,
-    CrontabSchedule,
     SolarSchedule,
-    ClockedSchedule
 )
-from django.http import JsonResponse
 
-from .models import Repository, Contributor
+from .bases import PredefinedUserAdminBase
+from .models import Contributor, Repository, Support
 from .telegram.bot import create_tg_link
 
 admin.site.unregister(Group)
@@ -27,7 +27,7 @@ admin.site.unregister(ClockedSchedule)
 
 
 @admin.register(Repository)
-class RepositoryAdmin(admin.ModelAdmin):
+class RepositoryAdmin(PredefinedUserAdminBase):
     """
     Custom Django admin class to manage Repository objects.
 
@@ -37,7 +37,6 @@ class RepositoryAdmin(admin.ModelAdmin):
 
     Methods:
         telegram_link: Adds a referral link to display in the list view.
-        get_form: Customizes the model form to set the user field to the current user.
         get_queryset: Filters the queryset to show only the current user's repositories.
 
     Attributes:
@@ -58,21 +57,6 @@ class RepositoryAdmin(admin.ModelAdmin):
         return format_html(
             '<a href="{}" target="_blank">Get info about repository</a>', link
         )
-
-    def get_form(self, request, obj=None, **kwargs) -> BaseModelForm:
-        """
-        A custom method to set the user field to the current user.
-        :param request: HttpRequest
-        :param obj: Repository
-        :param kwargs: dict
-        :return: BaseModelForm
-        """
-        form = super().get_form(request, obj, **kwargs)
-
-        form.base_fields["user"].initial = request.user
-        form.base_fields["user"].disabled = True
-
-        return form
 
     def get_queryset(self, request) -> QuerySet:
         """
@@ -145,3 +129,10 @@ class ContributorAdmin(admin.ModelAdmin):
             return JsonResponse(data, safe=False)
 
         return super().changelist_view(request, extra_context=extra_context)
+
+
+@admin.register(Support)
+class SupportAdmin(PredefinedUserAdminBase):
+    """
+    A class to manage Support objects that inherits PredefinedUserAdminBase class.
+    """
