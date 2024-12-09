@@ -4,19 +4,16 @@ import os
 
 import redis
 from asgiref.sync import async_to_sync
-from celery import Celery, shared_task
-from django.db.models import Q
+from celery import shared_task
 from dotenv import load_dotenv
 
 from tracker.models import Repository, TelegramUser
 from tracker.telegram.bot import send_new_issue_notification, send_revision_messages
 from tracker.utils import (
     compare_two_repo_dicts,
-    get_all_opened_issues,
     get_existing_issues_for_subscribed_users,
     get_user_revisions,
 )
-from tracker.values import ISSUES_URL
 
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
