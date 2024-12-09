@@ -3,7 +3,6 @@ from django.core.exceptions import ValidationError
 from django.db import transaction
 
 from .choices import Roles
-
 from .models import CustomUser
 
 

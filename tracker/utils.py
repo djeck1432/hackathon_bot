@@ -1,14 +1,17 @@
 import logging
+import re
 from collections import defaultdict
 from datetime import datetime, timedelta, timezone
 
 import requests
+from aiogram import html
 from asgiref.sync import async_to_sync, sync_to_async
 from dateutil.relativedelta import relativedelta
 
 from .values import (
     DATETIME_FORMAT,
     HEADERS,
+    ISSUES_SEARCH,
     PULLS_REVIEWS_URL,
     PULLS_URL,
     SECONDS_IN_AN_HOUR,
@@ -16,6 +19,17 @@ from .values import (
 
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
+
+
+def escape_html(text: str) -> str:
+    """
+    Escapes HTML symbols in the text to ensure proper rendering in Telegram messages.
+
+    :param text: The input string that may contain HTML symbols.
+    :return: A string with HTML symbols escaped, replacing '&' with '&amp;', '<' with '&lt;',
+             and '>' with '&gt;'.
+    """
+    return html.unparse(text)
 
 
 @sync_to_async
@@ -27,9 +41,11 @@ def get_all_repostitories(tele_id: str) -> list[dict]:
     """
     from .models import TelegramUser
 
-    repositories = TelegramUser.objects.get(
-        telegram_id=tele_id
-    ).user.repository_set.values()
+    repositories = (
+        TelegramUser.objects.filter(telegram_id=tele_id)
+        .first()
+        .user.repository_set.values()
+    )
 
     return list(repositories)
 
@@ -227,7 +243,7 @@ def get_all_available_issues(url: str) -> list[dict]:
                 issues,
             )
         )
-        logger.info(available_issues)
+
         return available_issues
 
     except requests.exceptions.RequestException as e:
@@ -288,11 +304,10 @@ def get_contributor_issues(
     :param username: The username of the github account.
     :return: A list representing issues assigned.
     """
+    api_url = ISSUES_SEARCH.format(username=username)
+
     try:
-        api_url = ISSUES_SEARCH.format(username=username)
-
         response = requests.get(api_url, headers=HEADERS)
-
         response.raise_for_status()
 
         issues = response.json().get("items", [])
@@ -305,9 +320,7 @@ def get_contributor_issues(
             labels = [label.get("name") for label in issue.get("labels", [])]
             for label in labels:
                 if not match_label or re.search(regex, label, re.IGNORECASE):
-                    issues_format.append(
-                        f"Issue: {issue.get('title')}: {issue.get('html_url')}"
-                    )
+                    issues_format.append(f"Issue: {attach_link_to_issue(issue)}")
                     break
 
         return issues_format
@@ -317,7 +330,7 @@ def get_contributor_issues(
     return []
 
 
-def attach_link_to_issue(issue_title: str, issue_link: str) -> str:
+def attach_link_to_issue(issue: dict) -> str:
     """
     Attaches the issue link to the issue title
     :params issue_title: The title of the issue
@@ -325,6 +338,9 @@ def attach_link_to_issue(issue_title: str, issue_link: str) -> str:
 
     :return: str
     """
+    issue_title: str = issue.get("title", "")
+    issue_link: str = issue.get("html_url", "")
+
     title = f'<a href="{issue_link}">{issue_title}</a>'
     return title
 
@@ -379,28 +395,29 @@ def get_time_before_deadline(issue: dict) -> str:
 def get_support_link(telegram_username: str) -> str:
     """
     Creates a clickable Telegram DM link for support.
-    
+
     :param telegram_username: The Telegram username without @ symbol
     :return: HTML formatted link to Telegram DM
     """
     # Remove @ if present in the username
-    clean_username = telegram_username.lstrip('@')
+    clean_username = telegram_username.lstrip("@")
     telegram_url = f"https://t.me/{clean_username}"
-    
-    return f'<a href="{telegram_url}">{clean_username}</a>'
+
+    # return escape_html(f'<a href="{telegram_url}">{clean_username}</a>')
+    return telegram_url
 
 
 @sync_to_async
 def get_repository_support(author: str, repo_name: str) -> "Support":
     """
     Gets the support contact for a specific repository.
-    
+
     :param author: Repository author
     :param repo_name: Repository name
     :return: Support instance or None
     """
     from .models import Repository, Support
-    
+
     repository = Repository.objects.filter(author=author, name=repo_name).first()
     if repository:
         return Support.objects.filter(user=repository.user).first()

@@ -1,20 +1,18 @@
-import django
+from unittest.mock import Mock, patch
 
-django.setup()
-
-
+import requests
 from asgiref.sync import async_to_sync
 from django.test import TestCase, TransactionTestCase
 from faker import Faker
 
 from tracker.choices import Roles
 from tracker.models import CustomUser, Repository, TelegramUser
-from tracker.utils import get_all_repostitories, get_user
-from unittest.mock import patch, Mock
-from tracker.utils import check_issue_assignment_events
-import requests
-
-from tracker.utils import create_telegram_user, get_all_repostitories, get_user
+from tracker.utils import (
+    check_issue_assignment_events,
+    create_telegram_user,
+    get_all_repostitories,
+    get_user,
+)
 
 fake = Faker()
 
@@ -45,13 +43,13 @@ class TestGetAllRepositories(TestCase):
         """Test invalid telegram ID raises exception."""
         with self.assertRaises(TelegramUser.DoesNotExist):
             async_to_sync(get_all_repostitories)(tele_id="987654321")
-            
+
+
 class TestGetUser(TestCase):
     def setUp(self):
         """Set up test data."""
         self.custom_user = CustomUser.objects.create(
-            email=fake.email(),
-            role=Roles.CONTRIBUTOR
+            email=fake.email(), role=Roles.CONTRIBUTOR
         )
         self.user_id = str(self.custom_user.id)
 
@@ -68,14 +66,15 @@ class TestGetUser(TestCase):
         with self.assertRaises(CustomUser.DoesNotExist):
             async_to_sync(get_user)(uuid=invalid_uuid)
 
+
 class TestCheckIssueAssignmentEvents(TestCase):
     def setUp(self):
         """Set up test data."""
         self.issue = {
             "events_url": "https://api.github.com/repos/owner/repo/issues/1/events"
         }
-        
-    @patch('requests.get')
+
+    @patch("requests.get")
     def test_successful_assignment_event(self, mock_get):
         """Test successful retrieval of assignment event."""
         # Mock response data
@@ -84,22 +83,21 @@ class TestCheckIssueAssignmentEvents(TestCase):
             {
                 "event": "assigned",
                 "assignee": {"login": "testuser"},
-                "created_at": "2024-01-01T12:00:00Z"
+                "created_at": "2024-01-01T12:00:00Z",
             }
         ]
         mock_response.raise_for_status.return_value = None
         mock_get.return_value = mock_response
 
         result = check_issue_assignment_events(self.issue)
-        
+
         self.assertEqual(result["assignee"], "testuser")
         self.assertEqual(result["assigned_at"], "2024-01-01T12:00:00Z")
         mock_get.assert_called_once_with(
-            self.issue["events_url"],
-            headers=patch.dict('tracker.utils.HEADERS', {})
+            self.issue["events_url"], headers=patch.dict("tracker.utils.HEADERS", {})
         )
 
-    @patch('requests.get')
+    @patch("requests.get")
     def test_multiple_assignment_events(self, mock_get):
         """Test that only the last assignment event is returned."""
         mock_response = Mock()
@@ -107,59 +105,58 @@ class TestCheckIssueAssignmentEvents(TestCase):
             {
                 "event": "assigned",
                 "assignee": {"login": "user1"},
-                "created_at": "2024-01-01T12:00:00Z"
+                "created_at": "2024-01-01T12:00:00Z",
             },
             {
                 "event": "assigned",
                 "assignee": {"login": "user2"},
-                "created_at": "2024-01-02T12:00:00Z"
-            }
+                "created_at": "2024-01-02T12:00:00Z",
+            },
         ]
         mock_response.raise_for_status.return_value = None
         mock_get.return_value = mock_response
 
         result = check_issue_assignment_events(self.issue)
-        
+
         self.assertEqual(result["assignee"], "user2")
         self.assertEqual(result["assigned_at"], "2024-01-02T12:00:00Z")
 
-    @patch('requests.get')
+    @patch("requests.get")
     def test_no_assignment_events(self, mock_get):
         """Test when there are no assignment events."""
         mock_response = Mock()
         mock_response.json.return_value = [
-            {
-                "event": "labeled",
-                "label": {"name": "bug"}
-            }
+            {"event": "labeled", "label": {"name": "bug"}}
         ]
         mock_response.raise_for_status.return_value = None
         mock_get.return_value = mock_response
 
         result = check_issue_assignment_events(self.issue)
-        
+
         self.assertEqual(result, {"assignee": "", "assigned_at": ""})
 
-    @patch('requests.get')
+    @patch("requests.get")
     def test_request_exception(self, mock_get):
         """Test handling of request exceptions."""
         mock_get.side_effect = requests.exceptions.RequestException("Network error")
 
         result = check_issue_assignment_events(self.issue)
-        
+
         self.assertEqual(result, {})
 
-    @patch('requests.get')
+    @patch("requests.get")
     def test_missing_events_url(self, mock_get):
         """Test handling of missing events_url."""
         issue_without_url = {}
-        
-        result = check_issue_assignment_events(issue_without_url)
-        
-        self.assertEqual(result, {})
-        mock_get.assert_called_once_with("", headers=patch.dict('tracker.utils.HEADERS', {}))
 
-    @patch('requests.get')
+        result = check_issue_assignment_events(issue_without_url)
+
+        self.assertEqual(result, {})
+        mock_get.assert_called_once_with(
+            "", headers=patch.dict("tracker.utils.HEADERS", {})
+        )
+
+    @patch("requests.get")
     def test_malformed_response(self, mock_get):
         """Test handling of malformed response data."""
         mock_response = Mock()
@@ -173,15 +170,16 @@ class TestCheckIssueAssignmentEvents(TestCase):
         mock_get.return_value = mock_response
 
         result = check_issue_assignment_events(self.issue)
-        
+
         self.assertEqual(result["assignee"], "")
         self.assertEqual(result["assigned_at"], "")
+
+
 class TestCreateTelegramUser(TransactionTestCase):
     def setUp(self):
         """Set up test data."""
         self.custom_user = CustomUser.objects.create(
-            email=f"test_create_user_{fake.email()}", 
-            role=Roles.CONTRIBUTOR
+            email=f"test_create_user_{fake.email()}", role=Roles.CONTRIBUTOR
         )
         self.telegram_id = str(fake.random_int(min=10000000000, max=99999999999))
 
@@ -213,9 +211,7 @@ class TestCreateTelegramUser(TransactionTestCase):
         """Test that no duplicate telegram user is created if one already exists."""
         TelegramUser.objects.filter(user=self.custom_user).delete()
 
-        TelegramUser.objects.create(
-            user=self.custom_user, telegram_id=self.telegram_id
-        )
+        TelegramUser.objects.create(user=self.custom_user, telegram_id=self.telegram_id)
 
         initial_count = TelegramUser.objects.filter(
             telegram_id=self.telegram_id, user=self.custom_user
@@ -234,16 +230,16 @@ class TestCreateTelegramUser(TransactionTestCase):
         TelegramUser.objects.filter(user=self.custom_user).delete()
 
         test_ids = [
-            "123456789", 
-            "0123456789",  
-            str(fake.random_int(min=10000000000, max=99999999999)), 
+            "123456789",
+            "0123456789",
+            str(fake.random_int(min=10000000000, max=99999999999)),
         ]
 
         for test_id in test_ids:
             with self.subTest(telegram_id=test_id):
 
                 TelegramUser.objects.filter(user=self.custom_user).delete()
-                
+
                 async_to_sync(create_telegram_user)(self.custom_user, test_id)
 
                 telegram_user = TelegramUser.objects.get(

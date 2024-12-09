@@ -1,19 +1,14 @@
 import requests
 from django.conf import settings
 from django.contrib.auth.models import AbstractBaseUser, BaseUserManager
-from django.core.validators import validate_email
 from django.core.exceptions import ValidationError
+from django.core.validators import validate_email
 from django.db import models
 from django_celery_beat.models import IntervalSchedule, PeriodicTask
-from django.db.models.signals import post_save
-from django.dispatch import receiver
-
 
 from shared.models import AbstractModel
 from tracker.choices import Roles
 from tracker.values import ROLE_MAX_CHARACTER_LENGTH, DefaultModelValues
-
-
 
 
 class CustomUserManager(BaseUserManager):
@@ -25,7 +20,9 @@ class CustomUserManager(BaseUserManager):
     - create_superuser: Creates and returns a new superuser with the given email and password.
     """
 
-    def create_user(self, email: str = None, password: str = None, role: str = None) -> "CustomUser":
+    def create_user(
+        self, email: str = None, password: str = None, role: str = None
+    ) -> "CustomUser":
         """
         Creates a new user
         :param email: str
@@ -33,7 +30,7 @@ class CustomUserManager(BaseUserManager):
         :param role: str = None
         :return: CustomUser
         """
-        if email: 
+        if email:
             try:
                 validate_email(email)
             except ValidationError:
@@ -41,7 +38,7 @@ class CustomUserManager(BaseUserManager):
 
         if not role:
             role = Roles.CONTRIBUTOR
-       
+
         user = self.model(
             email=self.normalize_email(email),
             password=password,
@@ -55,7 +52,9 @@ class CustomUserManager(BaseUserManager):
 
         return user
 
-    def create_superuser(self, email: str = None, password: str = None, role: str = None) -> "CustomUser":
+    def create_superuser(
+        self, email: str = None, password: str = None, role: str = None
+    ) -> "CustomUser":
         """
         Creates a new superuser
         :param email: str
@@ -135,7 +134,7 @@ class CustomUser(AbstractModel, AbstractBaseUser):
         :return: bool
         """
         return self.is_admin
-    
+
     def is_project_lead(self) -> bool:
         """
         Checks if the user is a project lead
@@ -202,6 +201,11 @@ class Repository(AbstractModel):
         """
         return f"{self.author}/{self.name}"
 
+    def save(self, *args, **kwargs) -> None:
+        repository = super().save(*args, **kwargs)
+
+        Support.objects.create(repository=repository)
+
 
 class TelegramUser(AbstractModel):
     """
@@ -249,7 +253,7 @@ class TelegramUser(AbstractModel):
 class Contributor(AbstractModel):
     """
     Representes a contributor with specific details and metadata
-    
+
     Attributes:
     - user (CustomUser): A ForeignKey to the CustomUser model.
     - role (str): The role of the contributor.
@@ -257,28 +261,31 @@ class Contributor(AbstractModel):
     - rank (int): A ranking for the contributor, also only visible to project leads.
     """
 
-    user = models.ForeignKey(CustomUser, on_delete=models.CASCADE, related_name="contributors")
-    role = models.CharField(max_length=ROLE_MAX_CHARACTER_LENGTH, choices=Roles.choices, default=Roles.CONTRIBUTOR)
+    user = models.ForeignKey(
+        CustomUser, on_delete=models.CASCADE, related_name="contributors"
+    )
+    role = models.CharField(
+        max_length=ROLE_MAX_CHARACTER_LENGTH,
+        choices=Roles.choices,
+        default=Roles.CONTRIBUTOR,
+    )
     notes = models.TextField(blank=True, null=True)
     rank = models.IntegerField(default=0)
 
     class Meta:
         verbose_name_plural = "Contributors"
-    
+
     def __str__(self):
         """
         Returns a string representation of the contributor, including the telegram_id from the related TelegramUser.
         """
-        telegram_id = self.user.telegramuser.telegram_id if hasattr(self.user, 'telegramuser') else "No Telegram ID"
+        telegram_id = (
+            self.user.telegramuser.telegram_id
+            if hasattr(self.user, "telegramuser")
+            else "No Telegram ID"
+        )
         return f"Contributor: {telegram_id} (Role: {self.role})"
-    
-@receiver(post_save, sender=CustomUser)
-def create_telegram_user(sender, instance, created, **kwargs):
-    """
-    Signal to create a TelegramUser instance when a new CustomUser is created.
-    """
-    if created:
-        TelegramUser.objects.get_or_create(user=instance, defaults={"telegram_id": f"default_{instance.id}"})
+
 
 class Support(AbstractModel):
     """
@@ -297,6 +304,6 @@ class Support(AbstractModel):
         Returns a string representation of the Support instance.
         :return: str
         """
-        if self.telegram_username.startswith('@'):
+        if self.telegram_username.startswith("@"):
             return f"{self.telegram_username}"
         return f"@{self.telegram_username}"
