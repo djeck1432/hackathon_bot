@@ -19,7 +19,7 @@ services:
       - "5432:5432"
     networks:
       - app_network
-
+# TODO add celery and celery beat containers
   backend:
     build: .
     restart: always

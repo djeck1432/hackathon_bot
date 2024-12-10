@@ -201,11 +201,6 @@ class Repository(AbstractModel):
         """
         return f"{self.author}/{self.name}"
 
-    def save(self, *args, **kwargs) -> None:
-        repository = super().save(*args, **kwargs)
-
-        Support.objects.create(repository=repository)
-
 
 class TelegramUser(AbstractModel):
     """
@@ -297,6 +292,7 @@ class Support(AbstractModel):
     """
 
     user = models.ForeignKey(CustomUser, on_delete=models.CASCADE)
+    repository = models.ForeignKey(Repository, null=True, on_delete=models.CASCADE)
     telegram_username = models.CharField(max_length=DefaultModelValues.name_max_length)
 
     def __str__(self) -> str:

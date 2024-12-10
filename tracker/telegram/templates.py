@@ -14,6 +14,7 @@ class TemplateNames:
     no_issues: Template
     issue_list_item: Template
     support_contact: Template
+    no_support: Template
 
 
 TEMPLATES = TemplateNames(
@@ -42,4 +43,5 @@ TEMPLATES = TemplateNames(
         "-----------------------------------\n"
     ),
     support_contact=Template("Support Contact:\n$repo_message\n$support_link"),
+    no_support=Template("Support Contact:\n$repo_message\nNo support provided."),
 )
