@@ -41,13 +41,12 @@ def get_all_repostitories(tele_id: str) -> list[dict]:
     """
     from .models import TelegramUser
 
-    repositories = (
-        TelegramUser.objects.filter(telegram_id=tele_id)
-        .first()
-        .user.repository_set.values()
-    )
+    telegram_user = TelegramUser.objects.filter(telegram_id=tele_id).first()
 
-    return list(repositories)
+    if telegram_user:
+        return list(telegram_user.user.repository_set.values())
+
+    return list()
 
 
 @sync_to_async
