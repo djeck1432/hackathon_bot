@@ -159,7 +159,7 @@ async def send_available_issues(msg: Message) -> None:
 async def get_contributor_tasks(message: Message):
     _, username = message.text.split(" ", 1)
 
-    regex = r"ODHack"
+    regex = r"odhack"
 
     issues = get_contributor_issues(username, True, True, regex)
 
@@ -181,6 +181,7 @@ async def send_revision_messages(telegram_id: str, reviews_data: list[dict]) -> 
     :params tele_id: The telegram user id of the user to send to
     :reviews_data: A list of all the reviews data for all pull requests associated to the user repos
     """
+    # TODO move it to `templates.py`
     message = (
         "=" * 50 + "\n" + "<b>Revisions and Approvals</b>" + "\n" + "=" * 50 + "\n\n"
     )
@@ -202,7 +203,7 @@ async def send_revision_messages(telegram_id: str, reviews_data: list[dict]) -> 
                 "\n\n"
             )
         message += "-------------------------------"
-    # Send bot message
+
     await bot.send_message(telegram_id, message)
 
 
@@ -231,7 +232,13 @@ async def send_support_contacts(msg: Message) -> None:
                 repo_message=repo_message,
                 support_link=support_link,
             )
-            await msg.reply(message, parse_mode="HTML")
+
+        else:
+            message = TEMPLATES.no_support.substitute(
+                repo_message=repo_message,
+            )
+
+        await msg.reply(message, parse_mode="HTML")
 
 
 def main_button_markup() -> ReplyKeyboardMarkup:

@@ -3,7 +3,7 @@ import asyncio
 from django.contrib import admin
 from django.contrib.auth.models import Group
 from django.db.models import QuerySet
-from django.http import JsonResponse
+from django.forms import BaseModelForm
 from django.utils.html import format_html
 from django.utils.safestring import SafeString
 from django_celery_beat.models import (
@@ -14,8 +14,9 @@ from django_celery_beat.models import (
     SolarSchedule,
 )
 
+from .choices import Roles
 from .bases import PredefinedUserAdminBase
-from .models import Contributor, Repository, Support
+from .models import Contributor, Repository, Support, CustomUser
 from .telegram.bot import create_tg_link
 
 admin.site.unregister(Group)
@@ -77,62 +78,67 @@ class ContributorAdmin(admin.ModelAdmin):
     Methods:
         get_queryset: Filters contributors based on the role of the logged-in user.
         changelist_view: Returns JSON data if requested, otherwise renders admin UI.
+        has_module_permission: Displays the model only for project leads.
     """
 
     list_display = ("user", "role", "rank", "notes")
-    search_fields = ("user__email", "user__telegramuser__telegram_id", "role")
-    list_filter = ("role",)
 
-    def get_queryset(self, request) -> QuerySet:
+    def has_module_permission(self, request) -> bool:
         """
-        Customize the queryset based on the user's role.
-        Project leads can see all contributors; others see limited data.
+        Displays the model only for project leads.
         :param request: HttpRequest
-        :return: QuerySet
+        :return: bool
         """
-        queryset = super().get_queryset(request)
+        user = request.user
 
-        if request.user.is_project_lead():
-            return queryset
-        return queryset.only("id", "user", "role")
+        if user.is_authenticated:
+            return user.role == Roles.PROJECT_LEAD
 
-    def changelist_view(self, request, extra_context=None):
+        return False
+
+    def get_form(self, request, obj=None, **kwargs) -> BaseModelForm:
         """
-        Customize the change list view for contributors.
-        Returns JSON data if requested via AJAX or API.
+        Customizes the model form to set the user field to the current user.
+        :param request: HttpRequest
+        :param obj: AbstractModel
+        :param kwargs: dict
+        :return: BaseModelForm
         """
-        if request.headers.get("Content-Type") == "application/json":
-            queryset = self.get_queryset(request)
-            user = request.user
+        form = super().get_form(request, obj, **kwargs)
 
-            if user.is_project_lead():
-                data = [
-                    {
-                        "id": contributor.id,
-                        "user": contributor.user.telegramuser.telegram_id,
-                        "role": contributor.role,
-                        "notes": contributor.notes,
-                        "rank": contributor.rank,
-                    }
-                    for contributor in queryset
-                ]
-            else:
-                data = [
-                    {
-                        "id": contributor.id,
-                        "user": contributor.user.telegramuser.telegram_id,
-                        "role": contributor.role,
-                    }
-                    for contributor in queryset
-                ]
+        form.base_fields["role"].initial = Roles.CONTRIBUTOR
+        form.base_fields["role"].disabled = True
+        form.base_fields["user"].queryset = CustomUser.objects.filter(role=Roles.CONTRIBUTOR)
 
-            return JsonResponse(data, safe=False)
-
-        return super().changelist_view(request, extra_context=extra_context)
+        return form
 
 
 @admin.register(Support)
 class SupportAdmin(PredefinedUserAdminBase):
     """
     A class to manage Support objects that inherits PredefinedUserAdminBase class.
+
+    Methods:
+        has_module_permissions: Displays the model only for project leads.
+        get_form: Customizes the model form to set the repository field to the current user's repositories.
     """
+
+    def has_module_permission(self, request) -> bool:
+        """
+        Displays the model only for project leads.
+        :param request: HttpRequest
+        :return: bool
+        """
+        user = request.user
+
+        if user.is_authenticated:
+            return user.role == Roles.PROJECT_LEAD
+
+        return False
+
+    def get_form(self, request, obj=None, **kwargs) -> BaseModelForm:
+        form = super().get_form(request, obj, **kwargs)
+
+        form.base_fields["repository"].queryset = Repository.objects.filter(user=request.user)
+
+        return form

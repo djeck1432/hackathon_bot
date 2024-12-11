@@ -29,7 +29,7 @@ services:
       - redis_data:/data
     networks:
       - app_network
-
+# TODO add celery and celery beat containers
   backend:
     build: .
     restart: always

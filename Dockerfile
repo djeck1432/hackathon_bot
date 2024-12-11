@@ -7,6 +7,8 @@ ENV POETRY_VIRTUALENVS_CREATE="false"
 RUN mkdir /app
 WORKDIR /app
 
+EXPOSE 8000
+
 ENV PYTHONPATH "${PYTHONPATH}:/app"
 
 COPY ./pyproject.toml /app
@@ -18,9 +20,6 @@ RUN apt-get update \
     && pip install --upgrade pip  \
     && pip --no-cache-dir install poetry \
     && poetry config virtualenvs.create false \
-    && poetry install --no-interaction --no-ansi --no-dev
+    && poetry install --no-interaction --no-ansi --only main
 
 ENTRYPOINT ["bash", "/app/entrypoint.sh"]
-
-# Expose the port
-EXPOSE 8000

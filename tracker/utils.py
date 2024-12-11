@@ -41,13 +41,12 @@ def get_all_repostitories(tele_id: str) -> list[dict]:
     """
     from .models import TelegramUser
 
-    repositories = (
-        TelegramUser.objects.filter(telegram_id=tele_id)
-        .first()
-        .user.repository_set.values()
-    )
+    telegram_user = TelegramUser.objects.filter(telegram_id=tele_id).first()
 
-    return list(repositories)
+    if telegram_user:
+        return list(telegram_user.user.repository_set.values())
+
+    return list()
 
 
 @sync_to_async
@@ -208,7 +207,7 @@ def get_issues_without_pull_requests(
 
     for issue in issues.copy():
         if (
-            issue.get("days", 0) >= 1
+            issue.get("days", 0) >= 1 # TODO make it correspond to repository settings
             and issue.get("assignee", dict()).get("login") not in pull_requests_users
         ):
             result.append(issue)
@@ -420,5 +419,5 @@ def get_repository_support(author: str, repo_name: str) -> "Support":
 
     repository = Repository.objects.filter(author=author, name=repo_name).first()
     if repository:
-        return Support.objects.filter(user=repository.user).first()
+        return Support.objects.filter(user=repository.user, repository=repository).first()
     return None
